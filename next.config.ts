@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Server-side packages that should not be bundled for the client
+  serverExternalPackages: ["exceljs"],
 };
 
 export default nextConfig;

@@ -1,0 +1,5 @@
+# Keep data directory structure but ignore runtime files
+leads/*.json
+leads/*.xlsx
+service_requests/*.json
+feedback/*.json

@@ -1,0 +1,580 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// PlantMind AI — Complete Database Schema
+// Supabase PostgreSQL via Prisma
+// ═══════════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Organization & Auth ──────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  plan      String   @default("free")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  users              User[]
+  equipment          Equipment[]
+  documents          Document[]
+  maintenanceRecords MaintenanceRecord[]
+  incidents          Incident[]
+  inspections        Inspection[]
+  complianceRecords  ComplianceRecord[]
+  conversations      Conversation[]
+  bookings           Booking[]
+  notifications      Notification[]
+  knowledgeNodes     KnowledgeNode[]
+  auditLogs          AuditLog[]
+  tags               Tag[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String
+  avatar         String?
+  role           Role     @default(VIEWER)
+  organizationId String
+  supabaseId     String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  documents      Document[]        @relation("UploadedBy")
+  maintenanceAssigned MaintenanceRecord[] @relation("AssignedTo")
+  incidentsReported   Incident[]    @relation("ReportedBy")
+  conversations  Conversation[]
+  bookings       Booking[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+
+  @@map("users")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  ENGINEER
+  OPERATOR
+  VIEWER
+}
+
+// ── Equipment ────────────────────────────────────────────────────────────────
+
+model EquipmentCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  equipment Equipment[]
+
+  @@map("equipment_categories")
+}
+
+model Equipment {
+  id             String   @id @default(cuid())
+  name           String
+  model          String
+  series         String
+  serialNumber   String?
+  categoryId     String
+  organizationId String
+  status         EquipmentStatus @default(OPERATIONAL)
+  healthScore    Int             @default(100)
+  riskScore      Int             @default(0)
+  location       String?
+  floor          String?
+  bay            String?
+  specifications Json?
+  image          String?
+  commissionDate DateTime?
+  warrantyExpiry DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  category       EquipmentCategory @relation(fields: [categoryId], references: [id])
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  documents      Document[]
+  maintenanceRecords MaintenanceRecord[]
+  incidents      Incident[]
+  inspections    Inspection[]
+  knowledgeNodes KnowledgeNode[]
+  bookings       Booking[]
+
+  @@map("equipment")
+}
+
+enum EquipmentStatus {
+  OPERATIONAL
+  MAINTENANCE
+  OFFLINE
+  CRITICAL
+  DECOMMISSIONED
+}
+
+// ── Documents ────────────────────────────────────────────────────────────────
+
+model Document {
+  id                   String   @id @default(cuid())
+  title                String
+  filename             String
+  mimeType             String
+  size                 Int
+  storagePath          String
+  type                 DocumentType @default(MANUAL)
+  status               DocumentStatus @default(UPLOADED)
+  ocrStatus            ProcessingStatus @default(PENDING)
+  embeddingStatus      ProcessingStatus @default(PENDING)
+  knowledgeGraphStatus ProcessingStatus @default(PENDING)
+  pages                Int?
+  extractedText        String?
+  metadata             Json?
+  organizationId       String
+  uploadedById         String
+  equipmentId          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  deletedAt            DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  uploadedBy   User         @relation("UploadedBy", fields: [uploadedById], references: [id])
+  equipment    Equipment?   @relation(fields: [equipmentId], references: [id])
+  chunks       DocumentChunk[]
+  tags         DocumentTag[]
+
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id          String   @id @default(cuid())
+  documentId  String
+  content     String
+  chunkIndex  Int
+  pageNumber  Int?
+  embedding   String?  // Qdrant point ID reference
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_chunks")
+}
+
+enum DocumentType {
+  MANUAL
+  REPORT
+  REGULATION
+  SOP
+  DRAWING
+  INSPECTION
+  CERTIFICATE
+  INVOICE
+  OTHER
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  INDEXED
+  ERROR
+}
+
+enum ProcessingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETE
+  FAILED
+  SKIPPED
+}
+
+// ── Maintenance ──────────────────────────────────────────────────────────────
+
+model MaintenanceRecord {
+  id             String   @id @default(cuid())
+  equipmentId    String
+  organizationId String
+  type           MaintenanceType
+  priority       Priority @default(MEDIUM)
+  status         MaintenanceStatus @default(SCHEDULED)
+  title          String
+  description    String?
+  scheduledDate  DateTime
+  startedAt      DateTime?
+  completedAt    DateTime?
+  estimatedHours Float?
+  actualHours    Float?
+  cost           Float?
+  assignedToId   String?
+  checklist      Json?
+  aiRecommendation String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  equipment    Equipment    @relation(fields: [equipmentId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  assignedTo   User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  @@map("maintenance_records")
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  PREDICTIVE
+  EMERGENCY
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ── Incidents ────────────────────────────────────────────────────────────────
+
+model Incident {
+  id             String   @id @default(cuid())
+  title          String
+  description    String
+  equipmentId    String
+  organizationId String
+  reportedById   String
+  severity       Priority
+  status         IncidentStatus @default(OPEN)
+  rootCause      String?
+  resolution     String?
+  evidence       Json?
+  timeline       Json?
+  aiAnalysis     String?
+  downtime       Float?
+  cost           Float?
+  reportedAt     DateTime @default(now())
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  equipment    Equipment    @relation(fields: [equipmentId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  reportedBy   User         @relation("ReportedBy", fields: [reportedById], references: [id])
+
+  @@map("incidents")
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+// ── Inspections & Compliance ─────────────────────────────────────────────────
+
+model Inspection {
+  id             String   @id @default(cuid())
+  equipmentId    String
+  organizationId String
+  type           String
+  status         InspectionStatus @default(SCHEDULED)
+  scheduledDate  DateTime
+  completedDate  DateTime?
+  inspector      String?
+  findings       Json?
+  score          Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  equipment    Equipment    @relation(fields: [equipmentId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("inspections")
+}
+
+enum InspectionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  FAILED
+}
+
+model ComplianceRecord {
+  id             String   @id @default(cuid())
+  regulation     String
+  category       ComplianceCategory
+  status         ComplianceStatus @default(PENDING_REVIEW)
+  organizationId String
+  lastAuditDate  DateTime?
+  nextAuditDate  DateTime?
+  score          Float?
+  findings       Json?
+  evidence       Json?
+  riskLevel      Priority @default(MEDIUM)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("compliance_records")
+}
+
+enum ComplianceCategory {
+  FACTORY_ACT
+  ISO
+  PESO
+  OISD
+  ENVIRONMENTAL
+}
+
+enum ComplianceStatus {
+  COMPLIANT
+  NON_COMPLIANT
+  PENDING_REVIEW
+  EXPIRING
+}
+
+// ── Knowledge Graph ──────────────────────────────────────────────────────────
+
+model KnowledgeNode {
+  id             String   @id @default(cuid())
+  type           NodeType
+  label          String
+  properties     Json?
+  organizationId String
+  equipmentId    String?
+  neo4jId        String?  // Reference to Neo4j node
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  equipment    Equipment?   @relation(fields: [equipmentId], references: [id])
+  edgesFrom    KnowledgeEdge[] @relation("EdgeFrom")
+  edgesTo      KnowledgeEdge[] @relation("EdgeTo")
+
+  @@map("knowledge_nodes")
+}
+
+model KnowledgeEdge {
+  id           String   @id @default(cuid())
+  fromNodeId   String
+  toNodeId     String
+  relationship String
+  weight       Float?
+  properties   Json?
+  neo4jId      String?
+  createdAt    DateTime @default(now())
+
+  fromNode KnowledgeNode @relation("EdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   KnowledgeNode @relation("EdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@map("knowledge_edges")
+}
+
+enum NodeType {
+  EQUIPMENT
+  DOCUMENT
+  PERSON
+  INCIDENT
+  MAINTENANCE
+  PROCESS
+  REGULATION
+  PART
+  LOCATION
+  FAILURE_MODE
+}
+
+// ── Conversations ────────────────────────────────────────────────────────────
+
+model Conversation {
+  id             String   @id @default(cuid())
+  title          String?
+  userId         String
+  organizationId String
+  agentType      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  sources        Json?
+  confidence     Float?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ── Booking ──────────────────────────────────────────────────────────────────
+
+model Booking {
+  id               String   @id @default(cuid())
+  referenceNumber  String   @unique
+  organizationId   String
+  userId           String?
+  equipmentId      String?
+  name             String
+  company          String
+  phone            String
+  email            String
+  state            String
+  city             String
+  village          String?
+  industry         String?
+  machineCategory  String
+  series           String
+  model            String
+  modelLabel       String?
+  purchaseTimeline String
+  leadPriority     String
+  remarks          String?
+  status           BookingStatus @default(NEW)
+  whatsappSent     Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id])
+  equipment    Equipment?   @relation(fields: [equipmentId], references: [id])
+
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DEMO_SCHEDULED
+  NEGOTIATION
+  WON
+  LOST
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  title          String
+  message        String
+  type           NotificationType
+  read           Boolean  @default(false)
+  actionUrl      String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+  AI_INSIGHT
+  MAINTENANCE_DUE
+  INCIDENT_ALERT
+  COMPLIANCE_ALERT
+}
+
+// ── Tags ─────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id             String   @id @default(cuid())
+  name           String
+  color          String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  documents    DocumentTag[]
+
+  @@unique([name, organizationId])
+  @@map("tags")
+}
+
+model DocumentTag {
+  documentId String
+  tagId      String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+  @@map("document_tags")
+}
+
+// ── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  action         String
+  resource       String
+  resourceId     String?
+  details        Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("audit_logs")
+}

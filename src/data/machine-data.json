@@ -1,0 +1,86 @@
+{
+  "VMC": {
+    "CVM SERIES": [
+      { "model": "CVM500", "x": 500, "y": 400, "z": 450, "label": "CVM 500" },
+      { "model": "CVM650", "x": 650, "y": 500, "z": 500, "label": "CVM 650" },
+      { "model": "CVM800", "x": 800, "y": 500, "z": 500, "label": "CVM 800" },
+      { "model": "CVM1050", "x": 1050, "y": 560, "z": 560, "label": "CVM 1050" },
+      { "model": "CVM1160", "x": 1160, "y": 600, "z": 600, "label": "CVM 1160" },
+      { "model": "CVM1370", "x": 1370, "y": 700, "z": 700, "label": "CVM 1370" }
+    ],
+    "TAPMILL SERIES": [
+      { "model": "TAPMILL 500", "x": 500, "y": 400, "z": 450, "label": "TAPMILL 500" },
+      { "model": "TAPMILL 650", "x": 650, "y": 500, "z": 500, "label": "TAPMILL 650" },
+      { "model": "TAPMILL 800", "x": 800, "y": 500, "z": 500, "label": "TAPMILL 800" }
+    ],
+    "SMARTMILL SERIES": [
+      { "model": "SMARTMILL 500", "x": 500, "y": 400, "z": 450, "label": "SMARTMILL 500" },
+      { "model": "SMARTMILL 650", "x": 650, "y": 500, "z": 500, "label": "SMARTMILL 650" },
+      { "model": "SMARTMILL 850", "x": 850, "y": 550, "z": 550, "label": "SMARTMILL 850" }
+    ],
+    "DYNAMILL SERIES": [
+      { "model": "DM900", "x": 900, "y": 500, "z": 500, "label": "Dynamill DM 900" },
+      { "model": "DM1100", "x": 1100, "y": 600, "z": 600, "label": "Dynamill DM 1100" },
+      { "model": "DM1300", "x": 1300, "y": 650, "z": 650, "label": "Dynamill DM 1300" }
+    ],
+    "MEGAMILL SERIES": [
+      { "model": "MM1500", "x": 1500, "y": 750, "z": 750, "label": "MEGAMILL 1500" },
+      { "model": "MM2000", "x": 2000, "y": 900, "z": 800, "label": "MEGAMILL 2000" },
+      { "model": "MM2500", "x": 2500, "y": 1000, "z": 900, "label": "MEGAMILL 2500" }
+    ],
+    "AUTOMILL SERIES": [
+      { "model": "AM600", "x": 600, "y": 450, "z": 450, "label": "AUTOMILL 600" },
+      { "model": "AM800", "x": 800, "y": 500, "z": 500, "label": "AUTOMILL 800" },
+      { "model": "AM1000", "x": 1000, "y": 560, "z": 560, "label": "AUTOMILL 1000" }
+    ],
+    "TRAVERSE MILL SERIES": [
+      { "model": "TM1200", "x": 1200, "y": 600, "z": 600, "label": "TRAVERSE MILL 1200" },
+      { "model": "TM1500", "x": 1500, "y": 750, "z": 700, "label": "TRAVERSE MILL 1500" },
+      { "model": "TM2000", "x": 2000, "y": 900, "z": 800, "label": "TRAVERSE MILL 2000" }
+    ]
+  },
+  "VTL": {
+    "V TURN SERIES": [
+      { "model": "YCL600", "diameter": 600, "height": 500, "weight": 1500, "label": "YCL 600" },
+      { "model": "YCL700", "diameter": 700, "height": 600, "weight": 2000, "label": "YCL 700" },
+      { "model": "YCL850", "diameter": 850, "height": 750, "weight": 3000, "label": "YCL 850" },
+      { "model": "YCL1000", "diameter": 1000, "height": 900, "weight": 4000, "label": "YCL 1000" },
+      { "model": "YCL1250", "diameter": 1250, "height": 1100, "weight": 6000, "label": "YCL 1250" }
+    ]
+  },
+  "Grinding": {
+    "SURFGRIND SERIES": [
+      { "model": "SG618", "length": 600, "width": 300, "height": 350, "label": "SURFGRIND SG 618" },
+      { "model": "SG820", "length": 800, "width": 400, "height": 400, "label": "SURFGRIND SG 820" },
+      { "model": "SG1020", "length": 1000, "width": 500, "height": 450, "label": "SURFGRIND SG 1020" },
+      { "model": "SG1224", "length": 1200, "width": 600, "height": 500, "label": "SURFGRIND SG 1224" }
+    ],
+    "ROTARY SURFGRIND SERIES": [
+      { "model": "RSG600", "length": 600, "width": 600, "height": 400, "label": "ROTARY SURFGRIND 600" },
+      { "model": "RSG800", "length": 800, "width": 800, "height": 500, "label": "ROTARY SURFGRIND 800" },
+      { "model": "RSG1000", "length": 1000, "width": 1000, "height": 600, "label": "ROTARY SURFGRIND 1000" }
+    ],
+    "CREEP GRIND SERIES": [
+      { "model": "CG500", "length": 500, "width": 300, "height": 350, "label": "CREEP GRIND CG 500" },
+      { "model": "CG800", "length": 800, "width": 400, "height": 400, "label": "CREEP GRIND CG 800" },
+      { "model": "CG1000", "length": 1000, "width": 500, "height": 450, "label": "CREEP GRIND CG 1000" }
+    ]
+  },
+  "5 Axis VMC": {
+    "UNIMILL SERIES": [
+      { "model": "UM500", "length": 500, "width": 400, "height": 400, "label": "UNIMILL UM 500" },
+      { "model": "UM650", "length": 650, "width": 500, "height": 500, "label": "UNIMILL UM 650" },
+      { "model": "UM800", "length": 800, "width": 600, "height": 600, "label": "UNIMILL UM 800" },
+      { "model": "UM1000", "length": 1000, "width": 700, "height": 700, "label": "UNIMILL UM 1000" }
+    ]
+  },
+  "Turnmill": {
+    "H TURN SERIES": [
+      { "model": "HT200", "diameter": 200, "length": 500, "label": "H-TURN HT 200" },
+      { "model": "HT250", "diameter": 250, "length": 700, "label": "H-TURN HT 250" },
+      { "model": "HT320", "diameter": 320, "length": 1000, "label": "H-TURN HT 320" },
+      { "model": "HT400", "diameter": 400, "length": 1500, "label": "H-TURN HT 400" },
+      { "model": "HT500", "diameter": 500, "length": 2000, "label": "H-TURN HT 500" }
+    ]
+  }
+}

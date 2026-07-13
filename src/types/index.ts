@@ -198,7 +198,7 @@ export interface Booking {
   notes: string;
 }
 
-// ── User ─────────────────────────────────────────────────────────────────────
+// ── User (legacy interface — prefer AuthUser from @/types/auth for auth context) ──
 export interface User {
   id: string;
   name: string;
@@ -206,6 +206,9 @@ export interface User {
   role: "admin" | "engineer" | "operator" | "viewer";
   avatar?: string;
 }
+
+// Re-export auth types for convenience
+export type { AuthUser, UserRole } from "@/types/auth";
 
 // ── Knowledge Graph ──────────────────────────────────────────────────────────
 export interface GraphNode {

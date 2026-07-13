@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, MessageSquare, FileText, Network, Wrench,
   Calendar, AlertTriangle, Shield, BarChart3, Bot, Bell,
-  Settings, Bookmark, FileBarChart, Plug, Sparkles,
+  Settings, Bookmark, FileBarChart, Plug, Sparkles, LogOut, User,
 } from "lucide-react";
+import { useAuthStore } from "@/hooks/use-auth-store";
+import { getSupabaseBrowser } from "@/lib/database/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const mainNav = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -28,8 +31,33 @@ const workspaceNav = [
   { name: "Integrations", href: "/integrations", icon: Plug },
 ];
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { user, clearAuth } = useAuthStore();
+
+  const handleLogout = async () => {
+    try {
+      const supabase = getSupabaseBrowser();
+      await supabase.auth.signOut();
+    } finally {
+      clearAuth();
+      queryClient.clear();
+      router.push("/login");
+    }
+  };
+
+  const initials = user ? getInitials(user.name) : "?";
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-[280px] flex-col border-r border-border bg-white">
@@ -40,13 +68,19 @@ export function AppSidebar() {
         </div>
         <div>
           <h1 className="text-[15px] font-bold text-[#111827] tracking-tight">PlantMind AI</h1>
-          <p className="text-[11px] text-[#6B7280] font-medium">Industrial Intelligence</p>
+          {user?.organizationName && (
+            <p className="text-[11px] text-[#6B7280] font-medium truncate max-w-[160px]">
+              {user.organizationName}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Main Menu */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#9CA3AF]">Main Menu</p>
+        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#9CA3AF]">
+          Main Menu
+        </p>
         <nav className="space-y-0.5">
           {mainNav.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -61,7 +95,10 @@ export function AppSidebar() {
                     : "text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#111827]"
                 )}
               >
-                <item.icon className={cn("h-[18px] w-[18px]", isActive && "text-[#FF6B2C]")} strokeWidth={isActive ? 2.2 : 1.8} />
+                <item.icon
+                  className={cn("h-[18px] w-[18px]", isActive && "text-[#FF6B2C]")}
+                  strokeWidth={isActive ? 2.2 : 1.8}
+                />
                 <span>{item.name}</span>
               </Link>
             );
@@ -69,7 +106,9 @@ export function AppSidebar() {
         </nav>
 
         {/* Workspace */}
-        <p className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#9CA3AF]">Workspace</p>
+        <p className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#9CA3AF]">
+          Workspace
+        </p>
         <nav className="space-y-0.5">
           {workspaceNav.map((item) => {
             const isActive = pathname === item.href;
@@ -92,28 +131,51 @@ export function AppSidebar() {
         </nav>
       </div>
 
-      {/* Upgrade Card */}
-      <div className="px-4 pb-3">
-        <div className="rounded-2xl bg-gradient-to-br from-[#FFF7ED] to-[#FFF2EB] p-4 border border-[#FFEDD5]">
-          <p className="text-[13px] font-semibold text-[#111827]">Upgrade to Pro</p>
-          <p className="mt-1 text-[11px] text-[#6B7280] leading-relaxed">Unlock advanced analytics, custom reports and more.</p>
-          <button className="mt-3 rounded-xl bg-[#FF6B2C] px-4 py-2 text-[12px] font-semibold text-white shadow-sm transition-all hover:bg-[#FF824E] hover:shadow-md active:scale-[0.98]">
-            Upgrade Now
-          </button>
-        </div>
-      </div>
+      {/* User section */}
+      <div className="border-t border-border px-4 py-4 space-y-1">
+        {/* Profile link */}
+        <Link
+          href="/profile"
+          className={cn(
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200",
+            pathname === "/profile"
+              ? "bg-[#FFF2EB] text-[#FF6B2C]"
+              : "text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#111827]"
+          )}
+        >
+          <User className="h-[18px] w-[18px]" strokeWidth={1.8} />
+          <span>Profile</span>
+        </Link>
 
-      {/* User */}
-      <div className="border-t border-border px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FFF2EB] text-[11px] font-bold text-[#FF6B2C]">
-            AU
-          </div>
+        {/* User info + logout */}
+        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user.name}
+              className="h-9 w-9 rounded-full object-cover border border-[#E5E7EB]"
+            />
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFF2EB] text-[11px] font-bold text-[#FF6B2C]">
+              {initials}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-[#111827] truncate">Admin User</p>
-            <p className="text-[11px] text-[#6B7280] truncate">admin@cosmos.com</p>
+            <p className="text-[13px] font-semibold text-[#111827] truncate">
+              {user?.name ?? "Loading…"}
+            </p>
+            <p className="text-[11px] text-[#6B7280] truncate">
+              {user?.role ? user.role.charAt(0) + user.role.slice(1).toLowerCase() : ""}
+            </p>
           </div>
-          <Settings className="h-4 w-4 text-[#9CA3AF] hover:text-[#6B7280] cursor-pointer transition-colors" />
+          <button
+            onClick={handleLogout}
+            aria-label="Sign out"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-[#FEF2F2] hover:text-[#DC2626] transition-all"
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </aside>

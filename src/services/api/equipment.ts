@@ -1,29 +1,41 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Equipment Service — Client-side API calls (uses internal Next.js API routes)
+// Equipment API Service
 // ═══════════════════════════════════════════════════════════════════════════════
 
+import { authFetch } from "./auth";
 import type { Equipment } from "@/types";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API = "/api";
 
-export async function getEquipment(): Promise<Equipment[]> {
-  // TODO: Merge with Supabase equipment registry when configured
-  return [
-    { id: "1", name: "CVM-850 #1", model: "CVM-850", series: "CVM SERIES", category: "VMC", status: "operational", healthScore: 94, location: "Bay A - Line 1", lastMaintenance: "2026-06-15", nextMaintenance: "2026-07-15", specifications: { x: "850", y: "500", z: "500", spindle: "12000 RPM" }, documents: ["1", "5"] },
-    { id: "2", name: "DYNAMILL-1200", model: "DYNAMILL-1200", series: "DYNAMILL SERIES", category: "VMC", status: "maintenance", healthScore: 72, location: "Bay B - Line 2", lastMaintenance: "2026-06-01", nextMaintenance: "2026-07-01", specifications: { x: "1200", y: "600", z: "600", spindle: "10000 RPM" }, documents: ["5"] },
-    { id: "3", name: "V-TURN 1200", model: "V-TURN 1200", series: "V TURN SERIES", category: "VTL", status: "operational", healthScore: 88, location: "Bay C - Line 1", lastMaintenance: "2026-06-20", nextMaintenance: "2026-07-20", specifications: { diameter: "1200", height: "800", weight: "5000" }, documents: ["4"] },
-    { id: "4", name: "SURFGRIND-600", model: "SURFGRIND-600", series: "SURFGRIND SERIES", category: "Grinding", status: "critical", healthScore: 45, location: "Bay D - Line 1", lastMaintenance: "2026-05-10", nextMaintenance: "2026-06-10", specifications: { length: "600", width: "300", height: "200" }, documents: [] },
-    { id: "5", name: "UNIMILL-500", model: "UNIMILL-500", series: "UNIMILL SERIES", category: "5 Axis VMC", status: "operational", healthScore: 97, location: "Bay A - Line 3", lastMaintenance: "2026-06-25", nextMaintenance: "2026-07-25", specifications: { length: "500", width: "400", height: "350" }, documents: [] },
-  ];
+export interface EquipmentListResponse {
+  data:  Equipment[];
+  total: number;
+  page:  number;
+  limit: number;
 }
 
-export async function getEquipmentById(id: string): Promise<Equipment | null> {
-  const equipment = await getEquipment();
-  return equipment.find((e) => e.id === id) || null;
+export async function fetchEquipment(page = 1, limit = 20): Promise<EquipmentListResponse> {
+  const res = await authFetch(`${API}/equipment?page=${page}&limit=${limit}`);
+  if (!res.ok) throw new Error(`Failed to fetch equipment: ${res.status}`);
+  const json = await res.json();
+  return { data: json.data ?? [], total: json.meta?.pagination?.total ?? 0, page, limit };
+}
+
+export async function createEquipment(data: Partial<Equipment>): Promise<Equipment> {
+  const res = await authFetch(`${API}/equipment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Failed to create equipment: ${res.status}`);
+  const json = await res.json();
+  return json.data;
 }
 
 export async function getMachineData(): Promise<Record<string, unknown>> {
+  // Public endpoint — no auth required
   const res = await fetch(`${API}/machine-data`);
+  if (!res.ok) throw new Error(`Failed to fetch machine data: ${res.status}`);
   return res.json();
 }
 
@@ -31,11 +43,13 @@ export async function filterMachines(
   category: string,
   series: string,
   params: Record<string, number>
-) {
+): Promise<unknown> {
+  // Public endpoint — no auth required
   const res = await fetch(`${API}/machines/filter`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ category, series, params }),
   });
+  if (!res.ok) throw new Error(`Failed to filter machines: ${res.status}`);
   return res.json();
 }

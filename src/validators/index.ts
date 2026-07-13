@@ -28,6 +28,19 @@ export const documentUploadSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
+export const documentQuerySchema = z.object({
+  page:        z.coerce.number().min(1).default(1),
+  limit:       z.coerce.number().min(1).max(100).default(20),
+  sortBy:      z.string().optional(),
+  sortOrder:   z.enum(["asc", "desc"]).default("desc"),
+  search:      z.string().optional(),
+  status:      z.enum(["UPLOADED","PROCESSING","INDEXED","ERROR","FAILED"]).optional(),
+  type:        z.enum(["MANUAL","REPORT","REGULATION","SOP","DRAWING","INSPECTION","CERTIFICATE","INVOICE","OTHER"]).optional(),
+  equipmentId: z.string().optional(),
+  dateFrom:    z.string().optional(),
+  dateTo:      z.string().optional(),
+});
+
 // ── Equipment ────────────────────────────────────────────────────────────────
 export const createEquipmentSchema = z.object({
   name: z.string().min(1).max(255),

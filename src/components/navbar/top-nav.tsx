@@ -1,11 +1,55 @@
 "use client";
 
-import { Bell, Search, Plus, Calendar, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Bell, Search, Plus, ChevronDown, LogOut, User, Settings } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
+import { useAuthStore } from "@/hooks/use-auth-store";
+import { getSupabaseBrowser } from "@/lib/database/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function roleLabel(role: string): string {
+  const map: Record<string, string> = {
+    SUPER_ADMIN: "Super Admin",
+    ADMIN: "Administrator",
+    ENGINEER: "Engineer",
+    TECHNICIAN: "Technician",
+    OPERATOR: "Operator",
+    VIEWER: "Viewer",
+  };
+  return map[role] ?? role;
+}
 
 export function TopNav() {
-  const { user, notifications, setCommandOpen } = useStore();
+  const { notifications, setCommandOpen } = useStore();
+  const { user, clearAuth } = useAuthStore();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [profileOpen, setProfileOpen] = useState(false);
+
   const unread = notifications.filter((n) => !n.read).length;
+  const initials = user ? getInitials(user.name) : "?";
+
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    try {
+      const supabase = getSupabaseBrowser();
+      await supabase.auth.signOut();
+    } finally {
+      clearAuth();
+      queryClient.clear();
+      router.push("/login");
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-border bg-white/80 backdrop-blur-xl px-8">
@@ -28,11 +72,6 @@ export function TopNav() {
           <Plus className="h-4 w-4" strokeWidth={2.5} />
         </button>
 
-        {/* Calendar */}
-        <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-[#6B7280] transition-all hover:bg-[#F9FAFB] hover:text-[#111827]">
-          <Calendar className="h-4 w-4" />
-        </button>
-
         {/* Notifications */}
         <button className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-border text-[#6B7280] transition-all hover:bg-[#F9FAFB] hover:text-[#111827]">
           <Bell className="h-4 w-4" />
@@ -46,17 +85,85 @@ export function TopNav() {
         {/* Divider */}
         <div className="h-8 w-px bg-border mx-1" />
 
-        {/* Profile */}
-        <button className="flex items-center gap-3 rounded-2xl border border-border px-3 py-1.5 transition-all hover:bg-[#F9FAFB] hover:shadow-sm">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF2EB] text-[11px] font-bold text-[#FF6B2C]">
-            AU
-          </div>
-          <div className="text-left">
-            <p className="text-[12px] font-semibold text-[#111827]">{user?.name || "Admin User"}</p>
-            <p className="text-[10px] text-[#9CA3AF]">Administrator</p>
-          </div>
-          <ChevronDown className="h-3.5 w-3.5 text-[#9CA3AF]" />
-        </button>
+        {/* Profile dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-3 rounded-2xl border border-border px-3 py-1.5 transition-all hover:bg-[#F9FAFB] hover:shadow-sm"
+            aria-expanded={profileOpen}
+            aria-haspopup="true"
+          >
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF2EB] text-[11px] font-bold text-[#FF6B2C]">
+                {initials}
+              </div>
+            )}
+            <div className="text-left">
+              <p className="text-[12px] font-semibold text-[#111827]">
+                {user?.name ?? "Loading…"}
+              </p>
+              <p className="text-[10px] text-[#9CA3AF]">
+                {user?.role ? roleLabel(user.role) : ""}
+              </p>
+            </div>
+            <ChevronDown className={`h-3.5 w-3.5 text-[#9CA3AF] transition-transform ${profileOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Dropdown */}
+          {profileOpen && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setProfileOpen(false)}
+              />
+              <div className="absolute right-0 top-full z-20 mt-2 w-[220px] rounded-2xl border border-[#F3F4F6] bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+                {/* User info header */}
+                <div className="px-3 py-2.5 border-b border-[#F3F4F6] mb-1">
+                  <p className="text-[12px] font-semibold text-[#111827] truncate">{user?.name}</p>
+                  <p className="text-[11px] text-[#9CA3AF] truncate">{user?.email}</p>
+                  {user?.organizationName && (
+                    <p className="mt-0.5 text-[10px] text-[#FF6B2C] font-medium truncate">
+                      {user.organizationName}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => { setProfileOpen(false); router.push("/profile"); }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                >
+                  <User className="h-3.5 w-3.5 text-[#6B7280]" />
+                  View profile
+                </button>
+
+                <button
+                  onClick={() => { setProfileOpen(false); router.push("/settings"); }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-[#374151] hover:bg-[#F9FAFB] transition-colors"
+                >
+                  <Settings className="h-3.5 w-3.5 text-[#6B7280]" />
+                  Settings
+                </button>
+
+                <div className="my-1 h-px bg-[#F3F4F6]" />
+
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[12px] text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

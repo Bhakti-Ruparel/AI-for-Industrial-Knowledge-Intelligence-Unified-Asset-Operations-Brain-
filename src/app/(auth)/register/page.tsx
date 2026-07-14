@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Sparkles, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { getSupabaseBrowser } from "@/lib/database/supabase/client";
 
 interface FormErrors {
   firstName?: string;
@@ -72,7 +73,6 @@ export default function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [registered, setRegistered] = useState(false);
 
   const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -121,37 +121,27 @@ export default function RegisterPage() {
         return;
       }
 
-      setRegistered(true);
+      // Account created — auto sign in and go straight to dashboard
+      const supabase = getSupabaseBrowser();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      });
+
+      if (signInError) {
+        // Account was created but auto-login failed — send to login page
+        router.push("/login?message=" + encodeURIComponent("Account created! Please sign in."));
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setErrors({ form: "An unexpected error occurred. Please try again." });
     } finally {
       setIsLoading(false);
     }
   };
-
-  // ── Success screen ──────────────────────────────────────────────────────────
-  if (registered) {
-    return (
-      <div className="relative z-10 w-full max-w-[420px] px-4">
-        <div className="rounded-[24px] bg-white p-8 shadow-[0_8px_40px_rgba(0,0,0,0.06)] border border-[#F3F4F6] text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#F0FDF4]">
-            <CheckCircle2 className="h-7 w-7 text-[#16A34A]" />
-          </div>
-          <h2 className="mt-5 text-[20px] font-bold text-[#111827]">Check your email</h2>
-          <p className="mt-2 text-[13px] text-[#6B7280]">
-            We sent a verification link to <strong className="text-[#111827]">{form.email}</strong>.
-            Click the link to activate your account.
-          </p>
-          <button
-            onClick={() => router.push("/login")}
-            className="mt-6 w-full rounded-xl bg-[#FF6B2C] py-3 text-[13px] font-semibold text-white hover:bg-[#FF824E] transition-colors"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative z-10 w-full max-w-[420px] px-4">

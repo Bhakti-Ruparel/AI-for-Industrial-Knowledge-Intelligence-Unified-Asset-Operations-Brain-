@@ -2,238 +2,390 @@
 
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchDashboardMetrics } from "@/services/api/analytics";
-import { KPISkeleton, ErrorState, Shimmer } from "@/components/ui/page-skeleton";
+import {
+  fetchDashboardMetrics, fetchHealthTrend, fetchIncidentTrend,
+  fetchDocsByType, fetchMaintenanceCost,
+} from "@/services/api/analytics";
 import { useToast } from "@/components/ui/toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { KPISkeleton, ErrorState, Shimmer } from "@/components/ui/page-skeleton";
+import { ChartCard } from "@/components/shared/chart-card";
+import { PageHeader } from "@/components/shared/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, TrendingUp, Clock, Wrench, FileText, Bot, TrendingDown } from "lucide-react";
+import {
+  AreaChart, Area, BarChart, Bar, LineChart, Line,
+  PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend,
+} from "recharts";
+import {
+  TrendingUp, TrendingDown, BarChart3, Clock,
+  Wrench, FileText, Bot, Shield,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const chartPlaceholder = (label: string) => (
-  <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
-    <div className="text-center">
-      <BarChart3 className="mx-auto h-8 w-8 text-muted-foreground/50" />
-      <p className="mt-2 text-sm text-muted-foreground">{label}</p>
-      <p className="text-[10px] text-muted-foreground">Recharts integration — Phase 2</p>
-    </div>
-  </div>
-);
+// ── Theme ─────────────────────────────────────────────────────────────────────
+const tooltipStyle = {
+  background: "#fff",
+  border: "1px solid #F3F4F6",
+  borderRadius: "14px",
+  fontSize: 12,
+  padding: "10px 14px",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+};
 
+const CHART_COLORS = [
+  "#FF6B2C", "#3B82F6", "#22C55E",
+  "#F59E0B", "#8B5CF6", "#EC4899",
+];
+
+// ── KPI card ──────────────────────────────────────────────────────────────────
+function KpiCard({
+  title, value, change, positive, changeLabel, icon: Icon,
+}: {
+  title: string; value: string; change: number;
+  positive: boolean; changeLabel: string; icon: typeof BarChart3;
+}) {
+  return (
+    <div className="rounded-[20px] bg-white p-6 border border-[#F3F4F6] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)] transition-all duration-300 hover:-translate-y-0.5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[13px] text-zinc-500 font-medium">{title}</p>
+          <p className="mt-2.5 text-[30px] font-bold tracking-tight text-zinc-900 tabular-nums leading-none">
+            {value}
+          </p>
+          <div className="mt-2.5 flex items-center gap-1.5">
+            {positive
+              ? <TrendingUp  className="h-3.5 w-3.5 text-emerald-500" />
+              : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+            <span className={cn("text-[12px] font-semibold", positive ? "text-emerald-600" : "text-red-500")}>
+              {change > 0 ? "+" : ""}{change}%
+            </span>
+            <span className="text-[12px] text-zinc-400">{changeLabel}</span>
+          </div>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF2EB] shadow-[0_1px_3px_rgba(255,107,44,0.15)]">
+          <Icon className="h-5 w-5 text-[#FF6B2C]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Gauge ring ────────────────────────────────────────────────────────────────
+function GaugeRing({ value, max = 100, label }: { value: number; max?: number; label?: string }) {
+  const pct   = Math.min(value / max, 1);
+  const color =
+    pct >= 0.7  ? "#22C55E" :
+    pct >= 0.5  ? "#F59E0B" :
+    "#EF4444";
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-3">
+      <div className="relative flex h-36 w-36 items-center justify-center">
+        <svg className="h-36 w-36 -rotate-90" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#F3F4F6" strokeWidth="10" />
+          <circle
+            cx="50" cy="50" r="40" fill="none"
+            stroke={color} strokeWidth="10"
+            strokeDasharray="251.2"
+            strokeDashoffset={251.2 - pct * 251.2}
+            strokeLinecap="round"
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        <div className="absolute text-center">
+          <p className="text-[28px] font-bold text-zinc-900 tabular-nums leading-none">{value}</p>
+          {label && <p className="text-[10px] text-zinc-400 mt-1 font-medium">{label}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
   const toast = useToast();
 
   const { data: metrics, isLoading, isError, refetch } = useQuery({
     queryKey: ["analytics"],
-    queryFn: fetchDashboardMetrics,
+    queryFn:  fetchDashboardMetrics,
   });
+
+  const { data: healthTrend   = [], isLoading: lHealth   } = useQuery({ queryKey: ["analytics-health-trend"],   queryFn: () => fetchHealthTrend(30),    enabled: !!metrics });
+  const { data: incidentTrend = [], isLoading: lIncident } = useQuery({ queryKey: ["analytics-incident-trend"], queryFn: () => fetchIncidentTrend(30),  enabled: !!metrics });
+  const { data: docsByType    = [], isLoading: lDocs     } = useQuery({ queryKey: ["analytics-docs-type"],      queryFn: fetchDocsByType,               enabled: !!metrics });
+  const { data: maintCost     = [], isLoading: lCost     } = useQuery({ queryKey: ["analytics-maint-cost"],     queryFn: () => fetchMaintenanceCost(6), enabled: !!metrics });
 
   useEffect(() => {
     if (isError) toast.error("Failed to load analytics");
   }, [isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const kpis = metrics
-    ? [
-        {
-          title: "Equipment Uptime",
-          value: `${metrics.equipment.averageHealth}%`,
-          change: 2.1,
-          positive: true,
-          changeLabel: "vs last month",
-          icon: TrendingUp,
-        },
-        {
-          title: "Avg Downtime",
-          value: `${metrics.incidents.mttr} hrs`,
-          change: -15,
-          positive: false,
-          changeLabel: "reduced",
-          icon: Clock,
-        },
-        {
-          title: "Maintenance Tasks",
-          value: String(metrics.maintenance.total),
-          change: 8,
-          positive: true,
-          changeLabel: "this month",
-          icon: Wrench,
-        },
-        {
-          title: "Documents Processed",
-          value: metrics.documents.indexed.toLocaleString(),
-          change: 32,
-          positive: true,
-          changeLabel: "this week",
-          icon: FileText,
-        },
-        {
-          title: "AI Queries",
-          value: metrics.ai.queriesToday.toLocaleString(),
-          change: 18,
-          positive: true,
-          changeLabel: "vs last week",
-          icon: Bot,
-        },
-        {
-          title: "Compliance Score",
-          value: `${metrics.compliance.overallScore}%`,
-          change: 4,
-          positive: true,
-          changeLabel: "improvement",
-          icon: BarChart3,
-        },
-      ]
-    : [];
+  const kpis = metrics ? [
+    { title: "Equipment Uptime",    value: `${metrics.equipment.averageHealth}%`,      change:  2.1, positive: true,  changeLabel: "vs last month", icon: TrendingUp  },
+    { title: "Avg Resolution Time", value: `${metrics.incidents.mttr || 0} hrs`,       change: -15,  positive: false, changeLabel: "reduced",       icon: Clock       },
+    { title: "Maintenance Tasks",   value: String(metrics.maintenance.total),          change:  8,   positive: true,  changeLabel: "this month",    icon: Wrench      },
+    { title: "Docs Processed",      value: metrics.documents.indexed.toLocaleString(), change: 32,   positive: true,  changeLabel: "this week",     icon: FileText    },
+    { title: "AI Queries Today",    value: metrics.ai.queriesToday.toLocaleString(),   change: 18,   positive: true,  changeLabel: "vs yesterday",  icon: Bot         },
+    { title: "Compliance Score",    value: `${metrics.compliance.overallScore}%`,      change:  4,   positive: true,  changeLabel: "improvement",   icon: Shield      },
+  ] : [];
+
+  const complianceData = metrics ? [
+    { name: "Compliant",     value: metrics.compliance.compliant,    color: "#22C55E" },
+    { name: "Non-Compliant", value: metrics.compliance.nonCompliant, color: "#EF4444" },
+    { name: "Expiring",      value: metrics.compliance.expiring,     color: "#F59E0B" },
+  ].filter((d) => d.value > 0) : [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground">Performance metrics, usage statistics, and operational insights.</p>
-      </div>
+    <div className="space-y-6 max-w-[1400px] mx-auto">
+      <PageHeader
+        title="Analytics"
+        subtitle="Performance metrics, usage statistics, and operational intelligence."
+      />
 
       {isError && <ErrorState message="Failed to load analytics data." onRetry={refetch} />}
 
-      {/* KPIs */}
+      {/* KPI grid */}
       {isLoading ? (
         <KPISkeleton count={6} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {kpis.map((kpi) => (
-            <Card key={kpi.title} className="border-border/50 bg-card/50 backdrop-blur">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{kpi.title}</p>
-                    <p className="mt-2 text-3xl font-bold tracking-tight">{kpi.value}</p>
-                    <div className="mt-2 flex items-center gap-1">
-                      {kpi.positive ? (
-                        <TrendingUp className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3 text-red-500" />
-                      )}
-                      <span className={cn("text-xs font-medium", kpi.positive ? "text-emerald-500" : "text-red-500")}>
-                        {kpi.change > 0 ? "+" : ""}{kpi.change}%
-                      </span>
-                      <span className="text-xs text-muted-foreground">{kpi.changeLabel}</span>
-                    </div>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <kpi.icon className="h-5 w-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {kpis.map((kpi) => <KpiCard key={kpi.title} {...kpi} />)}
         </div>
       )}
 
-      {/* Live summary strip */}
+      {/* Alert strip */}
       {!isLoading && metrics && (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: "Critical Equipment", value: metrics.equipment.critical, accent: "text-red-600" },
-            { label: "Open Incidents",     value: metrics.incidents.open,     accent: "text-amber-600" },
-            { label: "Non-Compliant",      value: metrics.compliance.nonCompliant, accent: "text-orange-600" },
-            { label: "Docs Processing",    value: metrics.documents.processing, accent: "text-blue-600" },
+            { label: "Critical Equipment",  value: metrics.equipment.critical,      accent: "text-red-600",    bg: "bg-red-50/70 border-red-100"       },
+            { label: "Open Incidents",       value: metrics.incidents.open,          accent: "text-amber-600",  bg: "bg-amber-50/70 border-amber-100"   },
+            { label: "Non-Compliant",        value: metrics.compliance.nonCompliant, accent: "text-orange-600", bg: "bg-orange-50/70 border-orange-100" },
+            { label: "Docs Processing",      value: metrics.documents.processing,    accent: "text-blue-600",   bg: "bg-blue-50/70 border-blue-100"     },
           ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-zinc-100 bg-white p-4 text-center shadow-xs">
-              <p className={cn("text-2xl font-bold", item.accent)}>{item.value}</p>
-              <p className="text-xs text-zinc-500 mt-1">{item.label}</p>
+            <div key={item.label} className={cn("rounded-2xl border p-4 text-center", item.bg)}>
+              <p className={cn("text-2xl font-bold tabular-nums", item.accent)}>{item.value}</p>
+              <p className="text-[11px] text-zinc-500 mt-1 font-medium">{item.label}</p>
             </div>
           ))}
         </div>
       )}
 
       {isLoading && (
-        <div className="grid grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <Shimmer key={i} className="h-20 rounded-xl" />)}
+        <div className="grid grid-cols-4 gap-3">
+          {[1,2,3,4].map((i) => <Shimmer key={i} className="h-20 rounded-2xl" />)}
         </div>
       )}
 
-      {/* Charts */}
-      <Tabs defaultValue="equipment">
-        <TabsList>
-          <TabsTrigger value="equipment">Equipment</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="downtime">Downtime</TabsTrigger>
-          <TabsTrigger value="usage">AI Usage</TabsTrigger>
+      {/* Tabbed charts */}
+      <Tabs defaultValue="equipment" className="space-y-5">
+        <TabsList className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-1 h-auto gap-1 flex-wrap">
+          {["equipment","documents","maintenance","incidents","compliance","ai"].map((tab) => (
+            <TabsTrigger
+              key={tab}
+              value={tab}
+              className="rounded-lg px-4 py-1.5 text-[12px] font-semibold capitalize data-[state=active]:bg-white data-[state=active]:shadow-[0_1px_3px_rgba(0,0,0,0.08)] data-[state=active]:text-[#FF6B2C] transition-all"
+            >
+              {tab === "ai" ? "AI Usage" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="equipment" className="mt-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Equipment Health Over Time</CardTitle></CardHeader>
-              <CardContent>{chartPlaceholder("Line chart — health scores by week")}</CardContent>
-            </Card>
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Status Distribution</CardTitle></CardHeader>
-              <CardContent>
-                {!isLoading && metrics ? (
-                  <div className="flex h-48 items-center justify-center gap-6">
-                    {[
-                      { label: "Operational", value: metrics.equipment.operational, color: "bg-emerald-500" },
-                      { label: "Critical",     value: metrics.equipment.critical,    color: "bg-red-500"     },
-                    ].map((item) => (
-                      <div key={item.label} className="text-center">
-                        <div className={cn("mx-auto h-16 w-16 rounded-full flex items-center justify-center text-white text-xl font-bold", item.color)}>
-                          {item.value}
-                        </div>
-                        <p className="mt-2 text-xs text-zinc-500">{item.label}</p>
+        {/* ── Equipment ── */}
+        <TabsContent value="equipment" className="space-y-5">
+          <div className="grid gap-5 md:grid-cols-2">
+            <ChartCard title="Equipment Health Trend (30 days)" subtitle="Average health score across all machines" loading={lHealth} height={240}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={healthTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="hGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#FF6B2C" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#FF6B2C" stopOpacity={0.01} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9CA3AF" }} tickFormatter={(v: string) => v.slice(5)} interval="preserveStartEnd" />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#9CA3AF" }} unit="%" />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`${(v as number).toFixed(1)}%`, "Health"]} />
+                  <Area type="monotone" dataKey="value" stroke="#FF6B2C" strokeWidth={2} fill="url(#hGrad)" dot={false} activeDot={{ r: 4, fill: "#FF6B2C" }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Status Distribution" loading={isLoading} height={240}>
+              {metrics && (
+                <div className="flex items-center justify-center gap-10 h-full">
+                  {[
+                    { label: "Operational",  value: metrics.equipment.operational, color: "#22C55E" },
+                    { label: "Maintenance",  value: Math.max(0, metrics.equipment.total - metrics.equipment.operational - metrics.equipment.critical), color: "#F59E0B" },
+                    { label: "Critical",     value: metrics.equipment.critical,    color: "#EF4444" },
+                  ].map((item) => (
+                    <div key={item.label} className="text-center">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full text-white text-xl font-bold shadow-[0_4px_12px_rgba(0,0,0,0.15)]" style={{ background: item.color }}>
+                        {Math.max(0, item.value)}
                       </div>
-                    ))}
-                  </div>
-                ) : chartPlaceholder("Pie chart — operational vs maintenance vs critical")}
-              </CardContent>
-            </Card>
+                      <p className="mt-2.5 text-[11px] text-zinc-500 font-medium">{item.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ChartCard>
           </div>
         </TabsContent>
 
-        <TabsContent value="documents" className="mt-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Documents Processed</CardTitle></CardHeader>
-              <CardContent>{chartPlaceholder("Bar chart — documents per day")}</CardContent>
-            </Card>
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Document Types</CardTitle></CardHeader>
-              <CardContent>{chartPlaceholder("Donut chart — manuals, reports, SOPs, regulations")}</CardContent>
-            </Card>
+        {/* ── Documents ── */}
+        <TabsContent value="documents" className="space-y-5">
+          <div className="grid gap-5 md:grid-cols-2">
+            <ChartCard title="Documents by Type" loading={lDocs} height={260}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={docsByType} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Bar dataKey="value" name="Count" radius={[5, 5, 0, 0]} animationDuration={1200}>
+                    {docsByType.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Index Status" loading={isLoading} height={260}>
+              {metrics && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: "Indexed",    value: metrics.documents.indexed,    fill: "#22C55E" },
+                        { name: "Processing", value: metrics.documents.processing, fill: "#F59E0B" },
+                        { name: "Other",      value: Math.max(0, metrics.documents.total - metrics.documents.indexed - metrics.documents.processing), fill: "#94A3B8" },
+                      ].filter((d) => d.value > 0)}
+                      dataKey="value" cx="50%" cy="50%"
+                      innerRadius={60} outerRadius={90} paddingAngle={3}
+                      animationDuration={1200}
+                    >
+                      {[{ fill: "#22C55E" }, { fill: "#F59E0B" }, { fill: "#94A3B8" }].map((c, i) => (
+                        <Cell key={i} fill={c.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
           </div>
         </TabsContent>
 
-        <TabsContent value="downtime" className="mt-4">
-          <Card className="border-border/50 bg-card/50">
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Downtime by Equipment</CardTitle></CardHeader>
-            <CardContent>{chartPlaceholder("Stacked bar chart — downtime hours by machine per week")}</CardContent>
-          </Card>
+        {/* ── Maintenance ── */}
+        <TabsContent value="maintenance" className="space-y-5">
+          <ChartCard title="Maintenance Cost by Type (6 months)" subtitle="Breakdown of preventive, corrective, and predictive costs" loading={lCost} height={300}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={maintCost} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} tickFormatter={(v: number) => v > 0 ? `₹${(v / 1000).toFixed(0)}k` : "0"} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`₹${(v as number).toLocaleString("en-IN")}`, ""]} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="preventive" name="Preventive" stackId="a" fill="#22C55E" />
+                <Bar dataKey="corrective" name="Corrective"  stackId="a" fill="#EF4444" />
+                <Bar dataKey="predictive" name="Predictive"  stackId="a" fill="#3B82F6" radius={[5, 5, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
         </TabsContent>
 
-        <TabsContent value="usage" className="mt-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">AI Query Volume</CardTitle></CardHeader>
-              <CardContent>
-                {!isLoading && metrics ? (
-                  <div className="flex h-48 items-center justify-center flex-col gap-2">
-                    <p className="text-5xl font-bold text-zinc-900">{metrics.ai.queriesToday}</p>
-                    <p className="text-sm text-zinc-400">Queries today</p>
-                    <p className="text-xs text-zinc-300">Total: {metrics.ai.queriesTotal.toLocaleString()}</p>
+        {/* ── Incidents ── */}
+        <TabsContent value="incidents" className="space-y-5">
+          <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the past month" loading={lIncident} height={300}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={incidentTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="iGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#EF4444" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}   />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9CA3AF" }} tickFormatter={(v: string) => v.slice(5)} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Line type="monotone" dataKey="value" name="Incidents" stroke="#EF4444" strokeWidth={2.5} dot={{ r: 3, fill: "#EF4444" }} activeDot={{ r: 5 }} animationDuration={1200} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </TabsContent>
+
+        {/* ── Compliance ── */}
+        <TabsContent value="compliance" className="space-y-5">
+          <div className="grid gap-5 md:grid-cols-2">
+            <ChartCard title="Compliance Status" loading={isLoading} height={280}>
+              {metrics && complianceData.length > 0 && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={complianceData} dataKey="value" cx="50%" cy="50%" innerRadius={65} outerRadius={95} paddingAngle={3} animationDuration={1200}>
+                      {complianceData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+              {metrics && complianceData.length === 0 && (
+                <div className="flex h-full items-center justify-center flex-col gap-2">
+                  <p className="text-2xl font-bold text-emerald-600">All Clear</p>
+                  <p className="text-sm text-zinc-400">No compliance issues detected</p>
+                </div>
+              )}
+            </ChartCard>
+
+            <ChartCard title="Overall Compliance Score" loading={isLoading} height={280}>
+              {metrics && (
+                <>
+                  <GaugeRing value={metrics.compliance.overallScore} label="Score" />
+                  <p className="text-center text-[12px] text-zinc-500 mt-2">
+                    {metrics.compliance.compliant} compliant · {metrics.compliance.nonCompliant} violations · {metrics.compliance.expiring} expiring
+                  </p>
+                </>
+              )}
+            </ChartCard>
+          </div>
+        </TabsContent>
+
+        {/* ── AI Usage ── */}
+        <TabsContent value="ai" className="space-y-5">
+          <div className="grid gap-5 md:grid-cols-2">
+            <ChartCard title="AI Query Volume" subtitle="Queries today vs. all-time" loading={isLoading} height={280}>
+              {metrics && (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <div className="text-center">
+                    <p className="text-[52px] font-bold text-zinc-900 tabular-nums leading-none">{metrics.ai.queriesToday}</p>
+                    <p className="text-[13px] text-zinc-400 mt-2 font-medium">Queries today</p>
                   </div>
-                ) : chartPlaceholder("Area chart — queries per day")}
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 bg-card/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Avg Confidence</CardTitle></CardHeader>
-              <CardContent>
-                {!isLoading && metrics ? (
-                  <div className="flex h-48 items-center justify-center flex-col gap-2">
-                    <p className="text-5xl font-bold text-emerald-600">{Math.round(metrics.ai.avgConfidence * 100)}%</p>
-                    <p className="text-sm text-zinc-400">Average AI confidence</p>
+                  <div className="w-full max-w-xs space-y-1.5">
+                    <div className="flex justify-between text-[11px] text-zinc-400 font-medium">
+                      <span>Daily usage</span>
+                      <span className="font-bold text-zinc-700">{metrics.ai.queriesTotal.toLocaleString()} total</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-zinc-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[#FF6B2C] transition-all duration-700"
+                        style={{ width: metrics.ai.queriesTotal > 0 ? `${Math.min(100, (metrics.ai.queriesToday / Math.max(1, metrics.ai.queriesTotal)) * 100 * 30)}%` : "0%" }}
+                      />
+                    </div>
                   </div>
-                ) : chartPlaceholder("Confidence score over time")}
-              </CardContent>
-            </Card>
+                </div>
+              )}
+            </ChartCard>
+
+            <ChartCard title="Average AI Confidence" subtitle="Based on all-time query results" loading={isLoading} height={280}>
+              {metrics && (
+                <>
+                  <GaugeRing value={Math.round(metrics.ai.avgConfidence * 100)} label="Avg Conf." />
+                  <p className="text-center text-[12px] text-zinc-500 mt-2">
+                    Based on {metrics.ai.queriesTotal.toLocaleString()} queries
+                  </p>
+                </>
+              )}
+            </ChartCard>
           </div>
         </TabsContent>
       </Tabs>

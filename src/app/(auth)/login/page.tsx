@@ -66,8 +66,6 @@ export default function LoginPage() {
         const msg = signInError.message.toLowerCase();
         if (msg.includes("invalid login credentials") || msg.includes("invalid credentials")) {
           setError("Incorrect email or password. Please try again.");
-        } else if (msg.includes("email not confirmed")) {
-          setError("Please verify your email address before logging in. Check your inbox.");
         } else if (msg.includes("too many requests")) {
           setError("Too many login attempts. Please wait a few minutes and try again.");
         } else {

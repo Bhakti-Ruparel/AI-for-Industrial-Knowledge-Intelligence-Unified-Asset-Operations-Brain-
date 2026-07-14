@@ -2,6 +2,7 @@
 // Document Repository — Full production implementation
 // ═══════════════════════════════════════════════════════════════════════════════
 
+import { prisma } from "@/lib/database/prisma/client";
 import { BaseRepository, type PaginationOptions, type PaginatedResult } from "./base.repository";
 
 export interface DocumentQueryOptions extends PaginationOptions {
@@ -13,6 +14,11 @@ export interface DocumentQueryOptions extends PaginationOptions {
   dateTo?:      string;
 }
 
+// Shorthand accessor for the documentChunk model
+function chunkModel() {
+  return prisma ? (prisma as any).documentChunk : null;
+}
+
 export class DocumentRepository extends BaseRepository<any> {
   protected readonly model = "document";
 
@@ -21,14 +27,13 @@ export class DocumentRepository extends BaseRepository<any> {
     organizationId: string,
     opts: DocumentQueryOptions
   ): Promise<PaginatedResult<any>> {
-    const { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc",
-            search, status, type, equipmentId, dateFrom, dateTo } = opts;
+    const {
+      page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc",
+      search, status, type, equipmentId, dateFrom, dateTo,
+    } = opts;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {
-      organizationId,
-      deletedAt: null,
-    };
+    const where: Record<string, unknown> = { organizationId, deletedAt: null };
 
     if (status)      where["status"]      = status;
     if (type)        where["type"]        = type;
@@ -67,15 +72,15 @@ export class DocumentRepository extends BaseRepository<any> {
   async updateProcessingStatus(id: string, field: string, status: string) {
     return this.db.update({
       where: { id },
-      data: { [field]: status, updatedAt: new Date() },
+      data:  { [field]: status, updatedAt: new Date() },
     });
   }
 
-  // ── Stage updater (stage + timestamp) ─────────────────────────────────────
+  // ── Stage updater ─────────────────────────────────────────────────────────
   async updateStage(id: string, stage: string, extraData?: Record<string, unknown>) {
     return this.db.update({
       where: { id },
-      data: { processingStage: stage, updatedAt: new Date(), ...(extraData ?? {}) },
+      data:  { processingStage: stage, updatedAt: new Date(), ...(extraData ?? {}) },
     });
   }
 
@@ -83,7 +88,12 @@ export class DocumentRepository extends BaseRepository<any> {
   async storeExtractedText(id: string, text: string, pages?: number, language?: string) {
     return this.db.update({
       where: { id },
-      data: { extractedText: text, pages: pages ?? null, language: language ?? null, updatedAt: new Date() },
+      data:  {
+        extractedText: text,
+        pages:         pages    ?? null,
+        language:      language ?? null,
+        updatedAt:     new Date(),
+      },
     });
   }
 
@@ -91,39 +101,45 @@ export class DocumentRepository extends BaseRepository<any> {
   async storeSummary(id: string, summary: string) {
     return this.db.update({
       where: { id },
-      data: { summary, updatedAt: new Date() },
+      data:  { summary, updatedAt: new Date() },
     });
   }
 
   // ── Chunk persistence ──────────────────────────────────────────────────────
   async createChunks(chunks: {
-    documentId:    string;
-    chunkIndex:    number;
-    content:       string;
-    pageNumber?:   number;
-    tokenCount?:   number;
+    documentId:     string;
+    chunkIndex:     number;
+    content:        string;
+    pageNumber?:    number;
+    tokenCount?:    number;
     qdrantPointId?: string;
-    metadata?:     Record<string, unknown>;
+    metadata?:      Record<string, unknown>;
   }[]) {
-    // Use createMany only when DB is real (proxy returns null)
     if (!chunks.length) return;
+    const db = chunkModel();
+    if (!db) return;
     try {
-      return await this.db.createMany?.({ data: chunks, skipDuplicates: true });
+      return await db.createMany({ data: chunks, skipDuplicates: true });
     } catch {
-      // Fallback: create one by one (proxy safe)
+      // Fallback: upsert one by one (some pooler configs don't support createMany)
       for (const chunk of chunks) {
-        await this.db.create({ data: chunk }).catch(() => {});
+        await db.create({ data: chunk }).catch(() => {});
       }
     }
   }
 
   // ── Get chunks for a document ──────────────────────────────────────────────
-  async findChunks(documentId: string) {
-    // Access chunk model through prisma directly
-    return this.db.findMany?.({
-      where: { documentId },
-      orderBy: { chunkIndex: "asc" },
-    }) ?? [];
+  async findChunks(documentId: string): Promise<any[]> {
+    const db = chunkModel();
+    if (!db) return [];
+    try {
+      return await db.findMany({
+        where:   { documentId },
+        orderBy: { chunkIndex: "asc" },
+      });
+    } catch {
+      return [];
+    }
   }
 
   // ── Pending processing ─────────────────────────────────────────────────────
@@ -135,16 +151,16 @@ export class DocumentRepository extends BaseRepository<any> {
         status: { in: ["UPLOADED", "PROCESSING"] },
       },
       orderBy: { createdAt: "asc" },
-      take: 50,
+      take:    50,
     });
   }
 
   // ── Failed documents (for retry) ──────────────────────────────────────────
   async findFailed(organizationId: string) {
     return this.db.findMany({
-      where: { organizationId, deletedAt: null, status: "ERROR" },
+      where:   { organizationId, deletedAt: null, status: "ERROR" },
       orderBy: { updatedAt: "desc" },
-      take: 20,
+      take:    20,
     });
   }
 
@@ -152,14 +168,14 @@ export class DocumentRepository extends BaseRepository<any> {
   async markIndexed(id: string, metadata?: Record<string, unknown>) {
     return this.db.update({
       where: { id },
-      data: {
-        status: "INDEXED",
-        processingStage: "COMPLETE",
-        embeddingStatus: "COMPLETE",
+      data:  {
+        status:              "INDEXED",
+        processingStage:     "COMPLETE",
+        embeddingStatus:     "COMPLETE",
         knowledgeGraphStatus: "COMPLETE",
-        ocrStatus: "COMPLETE",
-        metadata: metadata ?? undefined,
-        updatedAt: new Date(),
+        ocrStatus:           "COMPLETE",
+        metadata:            metadata ?? undefined,
+        updatedAt:           new Date(),
       },
     });
   }
@@ -168,11 +184,11 @@ export class DocumentRepository extends BaseRepository<any> {
   async markFailed(id: string, stage: string, error: string) {
     return this.db.update({
       where: { id },
-      data: {
-        status: "ERROR",
+      data:  {
+        status:          "ERROR",
         processingStage: stage,
-        metadata: { lastError: error, failedAt: new Date().toISOString() },
-        updatedAt: new Date(),
+        metadata:        { lastError: error, failedAt: new Date().toISOString() },
+        updatedAt:       new Date(),
       },
     });
   }
@@ -184,7 +200,7 @@ export class DocumentRepository extends BaseRepository<any> {
         this.db.count({ where: { organizationId, deletedAt: null } }),
         this.db.count({ where: { organizationId, deletedAt: null, status: "INDEXED"    } }),
         this.db.count({ where: { organizationId, deletedAt: null, status: "PROCESSING" } }),
-        this.db.count({ where: { organizationId, deletedAt: null, status: { in: ["ERROR","FAILED"] } } }),
+        this.db.count({ where: { organizationId, deletedAt: null, status: { in: ["ERROR", "FAILED"] } } }),
       ]);
       return { total, indexed, processing, failed };
     } catch {
@@ -198,7 +214,7 @@ export class DocumentRepository extends BaseRepository<any> {
     if (!doc) return null;
     return this.db.update({
       where: { id },
-      data: { deletedAt: new Date(), updatedAt: new Date() },
+      data:  { deletedAt: new Date(), updatedAt: new Date() },
     });
   }
 }

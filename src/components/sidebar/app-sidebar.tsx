@@ -5,24 +5,27 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, MessageSquare, FileText, Network, Wrench,
-  Calendar, AlertTriangle, Shield, BarChart3, Bot, Bell,
-  Settings, Bookmark, FileBarChart, Plug, Sparkles, LogOut, User,
+  Calendar, AlertTriangle, Shield, BarChart3, Bot,
+  Bookmark, FileBarChart, Plug, Sparkles, LogOut, User,
+  Cpu, Lightbulb,
 } from "lucide-react";
 import { useAuthStore } from "@/hooks/use-auth-store";
 import { getSupabaseBrowser } from "@/lib/database/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
 const mainNav = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "AI Copilot", href: "/copilot", icon: MessageSquare },
-  { name: "Documents", href: "/documents", icon: FileText },
-  { name: "Knowledge Graph", href: "/knowledge-graph", icon: Network },
-  { name: "Equipment", href: "/equipment", icon: Wrench },
-  { name: "Maintenance", href: "/maintenance", icon: Calendar },
-  { name: "Incidents", href: "/incidents", icon: AlertTriangle },
-  { name: "Compliance", href: "/compliance", icon: Shield },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "AI Agents", href: "/agents", icon: Bot },
+  { name: "Dashboard",       href: "/dashboard",       icon: LayoutDashboard },
+  { name: "AI Copilot",      href: "/copilot",          icon: MessageSquare   },
+  { name: "Documents",       href: "/documents",        icon: FileText        },
+  { name: "AI Pipeline",     href: "/pipeline",         icon: Cpu             },
+  { name: "Knowledge Graph", href: "/knowledge-graph",  icon: Network         },
+  { name: "Equipment",       href: "/equipment",        icon: Wrench          },
+  { name: "Maintenance",     href: "/maintenance",      icon: Calendar        },
+  { name: "Incidents",       href: "/incidents",        icon: AlertTriangle   },
+  { name: "Compliance",      href: "/compliance",       icon: Shield          },
+  { name: "Analytics",       href: "/analytics",        icon: BarChart3       },
+  { name: "AI Insights",     href: "/insights",         icon: Lightbulb       },
+  { name: "AI Agents",       href: "/agents",           icon: Bot             },
 ];
 
 const workspaceNav = [
@@ -40,7 +43,12 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  /** When provided, the sidebar renders as a drawer body (no fixed positioning). */
+  onClose?: () => void;
+}
+
+export function AppSidebar({ onClose }: AppSidebarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -60,21 +68,34 @@ export function AppSidebar() {
   const initials = user ? getInitials(user.name) : "?";
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[280px] flex-col border-r border-border bg-white">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-7 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6B2C] to-[#FF824E] shadow-sm">
-          <Sparkles className="h-4.5 w-4.5 text-white" />
+    <aside className={cn(
+      "flex h-screen w-[280px] flex-col border-r border-border bg-white",
+      // Desktop: fixed position. Mobile drawer: relative inside drawer container
+      onClose ? "relative h-full" : "fixed left-0 top-0 z-40"
+    )}>
+      {/* Logo — only shown when NOT inside mobile drawer (drawer has its own header) */}
+      {!onClose && (
+        <div className="flex items-center gap-3 px-7 py-6">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6B2C] to-[#FF824E] shadow-sm">
+            <Sparkles className="h-4.5 w-4.5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-[15px] font-bold text-[#111827] tracking-tight">PlantMind AI</h1>
+            {user?.organizationName && (
+              <p className="text-[11px] text-[#6B7280] font-medium truncate max-w-[160px]">
+                {user.organizationName}
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          <h1 className="text-[15px] font-bold text-[#111827] tracking-tight">PlantMind AI</h1>
-          {user?.organizationName && (
-            <p className="text-[11px] text-[#6B7280] font-medium truncate max-w-[160px]">
-              {user.organizationName}
-            </p>
-          )}
+      )}
+
+      {/* Org name in mobile drawer mode */}
+      {onClose && user?.organizationName && (
+        <div className="px-6 pt-3 pb-1">
+          <p className="text-[11px] font-medium text-[#9CA3AF] truncate">{user.organizationName}</p>
         </div>
-      </div>
+      )}
 
       {/* Main Menu */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -88,6 +109,7 @@ export function AppSidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onClose}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200",
                   isActive
@@ -116,6 +138,7 @@ export function AppSidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onClose}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200",
                   isActive

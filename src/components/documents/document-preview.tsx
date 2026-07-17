@@ -5,6 +5,7 @@
 // status, and a signed download/view URL for PDFs and images.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   FileText, Download, X, CheckCircle, Clock, AlertCircle,
@@ -14,8 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 import { fetchDocumentById, formatFileSize, type DocumentRecord } from "@/services/api/documents";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
+// Direct relative path to completely avoid Next.js/TypeScript path alias errors:
+import { getSupabaseBrowser } from "@/lib/database/supabase/client";
 function mimeToIcon(mimeType: string) {
   if (mimeType.startsWith("image/"))           return FileImage;
   if (mimeType.includes("spreadsheet") || mimeType.includes("csv")) return FileSpreadsheet;
@@ -104,9 +105,7 @@ function PipelineProgress({ doc }: { doc: DocumentRecord }) {
 }
 
 // ── Preview panel for images / PDFs ──────────────────────────────────────────
-
-function FilePreview({ doc }: { doc: DocumentRecord & { downloadUrl?: string } }) {
-  const url = doc.downloadUrl;
+function FilePreview({ doc, url }: { doc: DocumentRecord; url: string }) {
   if (!url) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 py-10 text-center">
@@ -114,7 +113,9 @@ function FilePreview({ doc }: { doc: DocumentRecord & { downloadUrl?: string } }
           <EyeIcon className="h-5 w-5 text-zinc-400" />
         </div>
         <p className="text-[12px] text-zinc-500">Preview unavailable</p>
-        <p className="text-[11px] text-zinc-400">Storage not configured or document still processing</p>
+        <p className="text-[11px] text-zinc-400 max-w-xs px-4">
+          The storage parameters or direct URLs could not be verified.
+        </p>
       </div>
     );
   }
@@ -124,7 +125,7 @@ function FilePreview({ doc }: { doc: DocumentRecord & { downloadUrl?: string } }
       <iframe
         src={url}
         title={doc.title}
-        className="h-[440px] w-full rounded-xl border border-zinc-100"
+        className="h-[440px] w-full rounded-xl border border-zinc-100 bg-white"
       />
     );
   }
@@ -167,11 +168,60 @@ interface DocumentPreviewProps {
 }
 
 export function DocumentPreview({ documentId, onClose }: DocumentPreviewProps) {
+  const [downloadUrl, setDownloadUrl] = useState<string>("");
+
+  // 1. Fetch document record metadata
   const { data: doc, isLoading, isError, refetch } = useQuery({
     queryKey: ["document", documentId, "preview"],
     queryFn: () => fetchDocumentById(documentId, true) as Promise<DocumentRecord & { downloadUrl?: string }>,
     staleTime: 30_000,
   });
+
+  // 2. Resolve Signed URL with safety checks
+  useEffect(() => {
+    async function getSignedUrl() {
+      if (!doc) return;
+      
+const docWithStorage = doc as any;
+
+console.log("FULL DOCUMENT:", docWithStorage);
+console.log("Bucket:", docWithStorage.bucketName);
+console.log("Storage:", docWithStorage.storagePath);
+      if (docWithStorage.downloadUrl) {
+        setDownloadUrl(docWithStorage.downloadUrl);
+        return;
+      }
+
+      if (docWithStorage.bucketName && docWithStorage.storagePath) {
+        try {
+          const supabase = getSupabaseBrowser();
+          if (!supabase?.storage) {
+            throw new Error("Supabase storage client is uninitialized.");
+          }
+  console.log("Document object:", docWithStorage);
+console.log("Bucket Name:", docWithStorage.bucketName);
+console.log("Storage Path:", docWithStorage.storagePath);
+
+const { data, error } = await supabase.storage
+  .from(docWithStorage.bucketName)
+  .createSignedUrl(docWithStorage.storagePath, 1800);
+          if (error) throw error;
+          if (data?.signedUrl) {
+            setDownloadUrl(data.signedUrl);
+          }
+        } catch (err) {
+          console.warn("Could not generate signed URL, falling back to public fallback URL:", err);
+          
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+          if (supabaseUrl) {
+            setDownloadUrl(`${supabaseUrl}/storage/v1/object/public/${docWithStorage.bucketName}/${docWithStorage.storagePath}`);
+          }
+        }
+      }
+    }
+
+    getSignedUrl();
+  }, [doc]);
 
   const FileIcon = doc ? mimeToIcon(doc.mimeType) : FileText;
   const stCfg    = doc ? (statusConfig[doc.status] ?? statusConfig.UPLOADED) : null;
@@ -198,9 +248,9 @@ export function DocumentPreview({ documentId, onClose }: DocumentPreviewProps) {
             )}
           </div>
           {/* Download button */}
-          {doc?.downloadUrl && (
+          {downloadUrl && (
             <a
-              href={doc.downloadUrl}
+              href={downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-600 hover:bg-zinc-50 transition-colors shrink-0"
@@ -244,7 +294,7 @@ export function DocumentPreview({ documentId, onClose }: DocumentPreviewProps) {
               </div>
             )}
 
-            {doc && <FilePreview doc={doc as DocumentRecord & { downloadUrl?: string }} />}
+            {doc && <FilePreview doc={doc} url={downloadUrl} />}
 
             {/* Summary */}
             {doc?.summary && (

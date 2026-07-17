@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Camera, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff, Building2, Shield, Mail } from "lucide-react";
 import { useAuthStore } from "@/hooks/use-auth-store";
 import { getSupabaseBrowser } from "@/lib/database/supabase/client";
@@ -32,6 +32,13 @@ export default function ProfilePage() {
   const [showPasswords, setShowPasswords] = useState({ current: false, newPass: false, confirm: false });
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync the input field when the user session loads on page refresh
+  useEffect(() => {
+    if (user?.name) {
+      setName(user.name);
+    }
+  }, [user]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,15 +108,18 @@ export default function ProfilePage() {
         .from("avatars")
         .getPublicUrl(path);
 
+      // Add a timestamp parameter to bypass browser caching
+      const freshUrl = `${publicUrl}?t=${Date.now()}`;
+
       // Save to profile
       const res = await fetch("/api/auth/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatar: publicUrl }),
+        body: JSON.stringify({ avatar: freshUrl }),
       });
 
       if (res.ok) {
-        setUser({ ...user, avatar: publicUrl });
+        setUser({ ...user, avatar: freshUrl });
         setProfileMessage({ type: "success", text: "Avatar updated" });
       } else {
         setProfileMessage({ type: "error", text: "Failed to save avatar" });

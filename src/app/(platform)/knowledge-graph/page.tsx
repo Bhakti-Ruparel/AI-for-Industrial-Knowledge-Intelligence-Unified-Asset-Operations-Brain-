@@ -4,13 +4,13 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchGraphNodes } from "@/services/api/knowledgeGraph";
 import { useToast } from "@/components/ui/toast";
-import { ErrorState } from "@/components/ui/page-skeleton";
+// Note: We can omit importing ErrorState if we aren't using it anymore
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
   Network, ZoomIn, ZoomOut, Maximize2, Info,
   Cpu, FileCode, ShieldAlert, FileText, User,
-  ArrowUpRight, CheckCircle2, Search, Filter, X,
+  ArrowUpRight, CheckCircle2, Search, Filter, X, AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -154,7 +154,7 @@ export default function KnowledgeGraphPage() {
         badge={
           <div className="flex items-center gap-2">
             {isUsingFallback && (
-              <Badge variant="outline" className="text-xs px-3 py-1 bg-amber-50 border-amber-200 text-amber-700 font-semibold rounded-xl">
+              <Badge variant="outline" className="text-xs px-3 py-1 bg-amber-50 border-amber-200 text-amber-700 font-semibold rounded-xl animate-pulse">
                 Sample Data
               </Badge>
             )}
@@ -165,7 +165,23 @@ export default function KnowledgeGraphPage() {
         }
       />
 
-      {isError && <ErrorState message="Failed to connect to knowledge graph." onRetry={refetch} />}
+      {/* 👉 FIX: Instead of blocking the whole screen with ErrorState, we show a clean, 
+        non-blocking inline alert banner since we have beautiful static fallback data ready.
+      */}
+      {isError && (
+        <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-red-100 bg-red-50/50 text-[13px] text-red-800">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+            <span><strong>Connection Failed:</strong> Unable to reach your database. Showing simulated offline model.</span>
+          </div>
+          <button 
+            onClick={() => refetch()} 
+            className="px-3 py-1 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-xs"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3">

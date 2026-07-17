@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { getSupabaseBrowser } from "@/lib/database/supabase/client";
 import { useAuthStore } from "@/hooks/use-auth-store";
 
-export default function LoginPage() {
+// ── Inner component uses useSearchParams (requires Suspense boundary) ─────────
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
@@ -211,5 +212,20 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+// ── Suspense wrapper — required because LoginForm uses useSearchParams ─────────
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="relative z-10 w-full max-w-[420px] px-4">
+        <div className="rounded-[24px] bg-white p-8 shadow-[0_8px_40px_rgba(0,0,0,0.06)] border border-[#F3F4F6] flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-6 w-6 animate-spin text-[#FF6B2C]" />
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// Settings redirects to Profile since Profile page handles all settings
-export default function SettingsPage() {
+function SettingsRedirect() {
   const router = useRouter();
   useEffect(() => {
     router.replace("/profile");
   }, [router]);
   return null;
+}
+
+// Settings redirects to Profile since Profile page handles all settings
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsRedirect />
+    </Suspense>
+  );
 }

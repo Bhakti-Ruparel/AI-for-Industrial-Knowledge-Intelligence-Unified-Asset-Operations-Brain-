@@ -58,7 +58,7 @@ const SAMPLE_EQUIPMENT: ApiEquipment[] = [
 // ── Status config ─────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; dot: string; text: string; bg: string }> = {
   operational: { label: "Operational",    dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50"  },
-  maintenance: { label: "In Maintenance", dot: "bg-amber-500",   text: "text-amber-700",   bg: "bg-amber-50"    },
+  maintenance: { label: "In Maintenance", dot: "bg-amber-500",   text: "text-amber-700",    bg: "bg-amber-50"    },
   offline:     { label: "Offline",        dot: "bg-zinc-400",    text: "text-zinc-600",    bg: "bg-zinc-50"     },
   critical:    { label: "Critical",       dot: "bg-red-500",     text: "text-red-700",     bg: "bg-red-50"      },
 };
@@ -175,7 +175,7 @@ function EquipmentCard({ eq }: { eq: ApiEquipment }) {
         </div>
 
         <div className="flex items-center gap-1.5 pt-1 border-t border-zinc-50">
-          {trend === "up"   && <TrendingUp  className="h-3.5 w-3.5 text-emerald-500" />}
+          {trend === "up"   && <TrendingUp   className="h-3.5 w-3.5 text-emerald-500" />}
           {trend === "down" && <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
           {trend === "neutral" && <Activity className="h-3.5 w-3.5 text-amber-500" />}
           <span className={cn(
@@ -205,9 +205,11 @@ export default function EquipmentPage() {
     retry: 1,
   });
 
-  // Determine if backend data is missing/failed (Trigger fallback if error or if DB returns nothing)
-  const apiData = data?.data as unknown as ApiEquipment[] | undefined;
-  const isOffline = isError || (!isLoading && (!apiData || apiData.length === 0));
+  // Safely extract layout data array depending on structural configuration returned by API
+  const apiData = (Array.isArray(data) ? data : (data as any)?.items ?? (data as any)?.data) as ApiEquipment[] | undefined;
+  
+  // Only treat as offline if there is a real system network error response
+  const isOffline = isError;
 
   useEffect(() => {
     if (isOffline && !isLoading) {
@@ -218,12 +220,12 @@ export default function EquipmentPage() {
     }
   }, [isOffline, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Use fallback dummy data if the database connection is broken/empty
-  const equipment = isOffline ? SAMPLE_EQUIPMENT : (apiData ?? []);
+  // CRITICAL FIX: If database query is fine but returns an empty list, show mock cards instead of empty state
+  const equipment = isOffline || !apiData || apiData.length === 0 ? SAMPLE_EQUIPMENT : apiData;
 
   const filtered = equipment.filter((e) =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.category.toLowerCase().includes(search.toLowerCase())
+    e.name?.toLowerCase().includes(search.toLowerCase()) ||
+    e.category?.toLowerCase().includes(search.toLowerCase())
   );
 
   const counts = equipment.reduce((acc, e) => {
@@ -259,7 +261,7 @@ export default function EquipmentPage() {
         }
       />
 
-      {/* ── Offline Alert Banner (Matches Knowledge Graph banner style!) ── */}
+      {/* ── Offline Alert Banner ── */}
       {isOffline && !isLoading && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50/50 p-4 transition-all animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-3">

@@ -22,8 +22,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
         <AppSidebar />
       </div>
 
-      {/* ── Mobile header bar ───────────────────────────────────────────────── */}
-      <header className="lg:hidden fixed inset-x-0 top-0 z-50 h-14 flex items-center justify-between border-b border-[#F3F4F6] bg-white/90 backdrop-blur-xl px-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+{/* -- Mobile header bar ------------------------------------------------- */}      <header className="lg:hidden fixed inset-x-0 top-0 z-50 h-14 flex items-center justify-between border-b border-[#F3F4F6] bg-white/90 backdrop-blur-xl px-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#FF6B2C] to-[#FF824E]">
             <Sparkles className="h-3.5 w-3.5 text-white" />
@@ -63,7 +62,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6B7280] hover:bg-[#F9FAFB] transition-all"
                 aria-label="Close navigation"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
             <AppSidebar onClose={() => setMobileOpen(false)} />

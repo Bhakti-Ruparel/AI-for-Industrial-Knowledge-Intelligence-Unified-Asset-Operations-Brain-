@@ -3,7 +3,6 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import neo4j, { Driver, Session } from "neo4j-driver";
-import { config } from "@/config";
 import { createLogger } from "@/utils/logger";
 
 const logger = createLogger("neo4j");
@@ -12,14 +11,18 @@ let driver: Driver | null = null;
 
 function getDriver(): Driver {
   if (!driver) {
-    driver = neo4j.driver(
-      config.neo4j.uri,
-      neo4j.auth.basic(config.neo4j.user, config.neo4j.password)
-    );
+    const uri      = process.env.NEO4J_URI      || "";
+    const user     = process.env.NEO4J_USER     || "neo4j";
+    const password = process.env.NEO4J_PASSWORD || "";
+
+    if (!uri || !password) {
+      logger.warn("NEO4J_URI or NEO4J_PASSWORD environment variables are not set");
+    }
+
+    driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
   }
   return driver;
 }
-
 function getSession(): Session {
   return getDriver().session();
 }

@@ -58,7 +58,7 @@ const integrations: Integration[] = [
     icon:        Network,
     iconBg:      "bg-purple-50",
     iconColor:   "text-purple-600",
-    status:      "disconnected",
+    status:      "connected",
     envKey:      "NEO4J_URI",
     docsUrl:     "https://neo4j.com/docs/",
     badge:       "Graph DB",

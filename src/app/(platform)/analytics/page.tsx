@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ── Theme ─────────────────────────────────────────────────────────────────────
+// ── Theme & Config ────────────────────────────────────────────────────────────
 const tooltipStyle = {
   background: "#fff",
   border: "1px solid #F3F4F6",
@@ -39,12 +39,18 @@ const CHART_COLORS = [
 ];
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
+interface KpiCardProps {
+  title: string;
+  value: string;
+  change: number;
+  positive: boolean;
+  changeLabel: string;
+  icon: typeof BarChart3;
+}
+
 function KpiCard({
   title, value, change, positive, changeLabel, icon: Icon,
-}: {
-  title: string; value: string; change: number;
-  positive: boolean; changeLabel: string; icon: typeof BarChart3;
-}) {
+}: KpiCardProps) {
   return (
     <div className="rounded-[20px] bg-white p-6 border border-[#F3F4F6] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)] transition-all duration-300 hover:-translate-y-0.5">
       <div className="flex items-start justify-between">
@@ -73,7 +79,7 @@ function KpiCard({
 
 // ── Gauge ring ────────────────────────────────────────────────────────────────
 function GaugeRing({ value, max = 100, label }: { value: number; max?: number; label?: string }) {
-  const pct   = Math.min(value / max, 1);
+  const pct   = Math.min(Math.max(0, value) / max, 1);
   const color =
     pct >= 0.7  ? "#22C55E" :
     pct >= 0.5  ? "#F59E0B" :
@@ -116,8 +122,10 @@ export default function AnalyticsPage() {
   const { data: maintCost     = [], isLoading: lCost     } = useQuery({ queryKey: ["analytics-maint-cost"],     queryFn: () => fetchMaintenanceCost(6), enabled: !!metrics });
 
   useEffect(() => {
-    if (isError) toast.error("Failed to load analytics");
-  }, [isError]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isError) {
+      toast.error("Failed to load analytics");
+    }
+  }, [isError, toast]);
 
   const kpis = metrics ? [
     { title: "Equipment Uptime",    value: `${metrics.equipment.averageHealth}%`,      change:  2.1, positive: true,  changeLabel: "vs last month", icon: TrendingUp  },
@@ -133,6 +141,11 @@ export default function AnalyticsPage() {
     { name: "Non-Compliant", value: metrics.compliance.nonCompliant, color: "#EF4444" },
     { name: "Expiring",      value: metrics.compliance.expiring,     color: "#F59E0B" },
   ].filter((d) => d.value > 0) : [];
+
+  // Protect calculations against unexpected zero limits
+  const queriesTotal = metrics?.ai?.queriesTotal ?? 0;
+  const queriesToday = metrics?.ai?.queriesToday ?? 0;
+  const fillPercentage = queriesTotal > 0 ? Math.min(100, (queriesToday / queriesTotal) * 100 * 30) : 0;
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
@@ -171,14 +184,14 @@ export default function AnalyticsPage() {
 
       {isLoading && (
         <div className="grid grid-cols-4 gap-3">
-          {[1,2,3,4].map((i) => <Shimmer key={i} className="h-20 rounded-2xl" />)}
+          {[1, 2, 3, 4].map((i) => <Shimmer key={i} className="h-20 rounded-2xl" />)}
         </div>
       )}
 
       {/* Tabbed charts */}
       <Tabs defaultValue="equipment" className="space-y-5">
         <TabsList className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-1 h-auto gap-1 flex-wrap">
-          {["equipment","documents","maintenance","incidents","compliance","ai"].map((tab) => (
+          {["equipment", "documents", "maintenance", "incidents", "compliance", "ai"].map((tab) => (
             <TabsTrigger
               key={tab}
               value={tab}
@@ -204,7 +217,10 @@ export default function AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9CA3AF" }} tickFormatter={(v: string) => v.slice(5)} interval="preserveStartEnd" />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#9CA3AF" }} unit="%" />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`${(v as number).toFixed(1)}%`, "Health"]} />
+                  <Tooltip 
+                    contentStyle={tooltipStyle} 
+                    formatter={(v: unknown) => [typeof v === "number" ? `${v.toFixed(1)}%` : "—", "Health"]} 
+                  />
                   <Area type="monotone" dataKey="value" stroke="#FF6B2C" strokeWidth={2} fill="url(#hGrad)" dot={false} activeDot={{ r: 4, fill: "#FF6B2C" }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -254,7 +270,7 @@ export default function AnalyticsPage() {
                   <PieChart>
                     <Pie
                       data={[
-                        { name: "Indexed",    value: metrics.documents.indexed,    fill: "#22C55E" },
+                        { name: "Indexed",    value: metrics.documents.indexed,   fill: "#22C55E" },
                         { name: "Processing", value: metrics.documents.processing, fill: "#F59E0B" },
                         { name: "Other",      value: Math.max(0, metrics.documents.total - metrics.documents.indexed - metrics.documents.processing), fill: "#94A3B8" },
                       ].filter((d) => d.value > 0)}
@@ -283,7 +299,7 @@ export default function AnalyticsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} tickFormatter={(v: number) => v > 0 ? `₹${(v / 1000).toFixed(0)}k` : "0"} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`₹${(v as number).toLocaleString("en-IN")}`, ""]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [typeof v === "number" ? `₹${v.toLocaleString("en-IN")}` : "—", ""]} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="preventive" name="Preventive" stackId="a" fill="#22C55E" />
                 <Bar dataKey="corrective" name="Corrective"  stackId="a" fill="#EF4444" />
@@ -295,7 +311,7 @@ export default function AnalyticsPage() {
 
         {/* ── Incidents ── */}
         <TabsContent value="incidents" className="space-y-5">
-          <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the past month" loading={lIncident} height={300}>
+          <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the the past month" loading={lIncident} height={300}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={incidentTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
@@ -357,18 +373,18 @@ export default function AnalyticsPage() {
               {metrics && (
                 <div className="flex flex-col items-center justify-center h-full gap-4">
                   <div className="text-center">
-                    <p className="text-[52px] font-bold text-zinc-900 tabular-nums leading-none">{metrics.ai.queriesToday}</p>
+                    <p className="text-[52px] font-bold text-zinc-900 tabular-nums leading-none">{queriesToday}</p>
                     <p className="text-[13px] text-zinc-400 mt-2 font-medium">Queries today</p>
                   </div>
                   <div className="w-full max-w-xs space-y-1.5">
                     <div className="flex justify-between text-[11px] text-zinc-400 font-medium">
                       <span>Daily usage</span>
-                      <span className="font-bold text-zinc-700">{metrics.ai.queriesTotal.toLocaleString()} total</span>
+                      <span className="font-bold text-zinc-700">{queriesTotal.toLocaleString()} total</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-zinc-100 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-[#FF6B2C] transition-all duration-700"
-                        style={{ width: metrics.ai.queriesTotal > 0 ? `${Math.min(100, (metrics.ai.queriesToday / Math.max(1, metrics.ai.queriesTotal)) * 100 * 30)}%` : "0%" }}
+                        style={{ width: `${fillPercentage}%` }}
                       />
                     </div>
                   </div>
@@ -381,7 +397,7 @@ export default function AnalyticsPage() {
                 <>
                   <GaugeRing value={Math.round(metrics.ai.avgConfidence * 100)} label="Avg Conf." />
                   <p className="text-center text-[12px] text-zinc-500 mt-2">
-                    Based on {metrics.ai.queriesTotal.toLocaleString()} queries
+                    Based on {queriesTotal.toLocaleString()} queries
                   </p>
                 </>
               )}

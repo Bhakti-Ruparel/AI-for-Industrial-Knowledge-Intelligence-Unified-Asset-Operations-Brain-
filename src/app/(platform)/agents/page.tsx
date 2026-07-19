@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
+import { authFetch } from "@/services/api/auth";
 import {
   Brain, Wrench, Shield, Search, Terminal, Settings2,
   Play, Pause, AlertCircle, Cpu, Fingerprint, Send, RefreshCw,
@@ -32,25 +34,21 @@ interface LogMessage {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const AGENTS: AIAgent[] = [
+const AGENT_DEFS: Omit<AIAgent, "tasksCompleted" | "accuracy" | "status" | "lastActive">[] = [
   {
     id: "1", name: "Knowledge Agent", type: "knowledge", icon: "brain",
-    status: "active", tasksCompleted: 1247, accuracy: 94.2, lastActive: "Just now",
     description: "Retrieves and synthesizes information from your document knowledge base using RAG. Answers technical queries about machines, processes, and standards.",
   },
   {
     id: "2", name: "Maintenance Agent", type: "maintenance", icon: "wrench",
-    status: "active", tasksCompleted: 342, accuracy: 91.8, lastActive: "5m ago",
     description: "Monitors equipment health scores, predicts failures, and generates maintenance schedules based on usage patterns and manufacturer guidelines.",
   },
   {
     id: "3", name: "Compliance Agent", type: "compliance", icon: "shield",
-    status: "idle", tasksCompleted: 89, accuracy: 96.1, lastActive: "2h ago",
     description: "Tracks regulatory compliance status, identifies gaps, and recommends corrective actions for Factory Act, ISO, PESO, and OISD standards.",
   },
   {
     id: "4", name: "RCA Agent", type: "rca", icon: "search",
-    status: "processing", tasksCompleted: 56, accuracy: 88.5, lastActive: "Running…",
     description: "Performs root cause analysis on equipment incidents using historical data, sensor readings, and maintenance logs to identify failure patterns.",
   },
 ];
@@ -72,26 +70,6 @@ const INITIAL_LOGS: Record<string, LogMessage[]> = {
   "3": [{ id: "i3", type: "system", text: "Standby sequence active. Waiting for manual audit trigger." }],
   "4": [{ id: "i4", type: "system", text: "Computing historical incident clusters for pump system #3…" }],
 };
-
-function getMockResponse(type: string, query: string): string {
-  const q = query.toLowerCase();
-  switch (type) {
-    case "knowledge":
-      if (q.includes("machine") || q.includes("standard"))
-        return "RAG Matrix: ISO 13374 architecture dictates a semantic score match threshold above 88% for heavy rotary assembly tolerances. Cross-referencing 14 indexed manuals.";
-      return "Synthesizing documentation: Identified matching context in asset manual cluster section B-4. All thresholds are currently indexed within normal operational guidelines.";
-    case "maintenance":
-      if (q.includes("fail") || q.includes("predict"))
-        return "Predictive Core: Vibration frequency spike at node-4G hints bearing wear degradation over next 42 production hours. Recommend scheduling preventive maintenance within 24h.";
-      return "Scheduling matrix generated: System recommends a lubricant flush cycle for the hydraulic unit within 4 business days. Priority: MEDIUM.";
-    case "compliance":
-      return "Compliance Auditor: Cross-referencing against OISD-118 and PESO norms. Current plant structural logs evaluate to 100% compliant. No anomalies flagged. Next audit due in 47 days.";
-    case "rca":
-      return "Root-Cause-Engine: Thermal telemetry spike matched to an intermittent encoder drop-out event observed historically during high load shifts. Confidence: 87%. Suggested fix: replace encoder on drive unit 3.";
-    default:
-      return "Agent pipeline response generated. No anomalies detected. All subsystems nominal.";
-  }
-}
 
 // ── Agent list row ────────────────────────────────────────────────────────────
 
@@ -175,6 +153,60 @@ export default function AgentsPage() {
   const logRef    = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
 
+  // Fetch real agent stats from DB (conversations per agent type + confidence)
+  const { data: agentStats } = useQuery({
+    queryKey: ["agent-stats"],
+    queryFn: async () => {
+      const res = await authFetch("/api/analytics?type=dashboard");
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.data;
+    },
+    staleTime: 60_000,
+  });
+
+  // Build agents with real or derived stats
+  const AGENTS: AIAgent[] = AGENT_DEFS.map((def) => {
+    const stats = agentStats;
+    let tasksCompleted = 0;
+    let accuracy = 0;
+    let status: AIAgent["status"] = "idle";
+    let lastActive = "—";
+
+    if (stats) {
+      switch (def.type) {
+        case "knowledge":
+          tasksCompleted = stats.ai?.queriesTotal ?? 0;
+          accuracy = Math.round((stats.ai?.avgConfidence ?? 0) * 100);
+          status = stats.ai?.queriesToday > 0 ? "active" : "idle";
+          lastActive = stats.ai?.queriesToday > 0 ? "Active today" : "—";
+          break;
+        case "maintenance":
+          tasksCompleted = stats.maintenance?.total ?? 0;
+          accuracy = stats.maintenance?.total > 0
+            ? Math.round(((stats.maintenance.completed ?? 0) / Math.max(1, stats.maintenance.total)) * 100)
+            : 0;
+          status = (stats.maintenance?.overdue ?? 0) > 0 ? "processing" : stats.maintenance?.total > 0 ? "active" : "idle";
+          lastActive = stats.maintenance?.total > 0 ? "Active" : "—";
+          break;
+        case "compliance":
+          tasksCompleted = (stats.compliance?.compliant ?? 0) + (stats.compliance?.nonCompliant ?? 0) + (stats.compliance?.expiring ?? 0);
+          accuracy = stats.compliance?.overallScore ?? 0;
+          status = tasksCompleted > 0 ? "active" : "idle";
+          lastActive = tasksCompleted > 0 ? "Active" : "Standby";
+          break;
+        case "rca":
+          tasksCompleted = stats.incidents?.resolved ?? 0;
+          accuracy = stats.incidents?.mttr > 0 ? Math.min(95, Math.round(100 - stats.incidents.mttr)) : 0;
+          status = (stats.incidents?.open ?? 0) > 0 ? "processing" : tasksCompleted > 0 ? "active" : "idle";
+          lastActive = (stats.incidents?.open ?? 0) > 0 ? "Analyzing…" : "—";
+          break;
+      }
+    }
+
+    return { ...def, tasksCompleted, accuracy: Math.max(0, Math.min(100, accuracy)), status, lastActive };
+  });
+
   const currentAgent = AGENTS.find((a) => a.id === selectedId) ?? AGENTS[0];
   const filteredAgents = AGENTS.filter((a) => filter === "all" || a.status === filter);
 
@@ -186,7 +218,7 @@ export default function AgentsPage() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [agentLogs, selectedId, isProcessing]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputQuery.trim() || isProcessing) return;
 
@@ -200,15 +232,28 @@ export default function AgentsPage() {
       [agentId]: [...(prev[agentId] ?? []), { id: `u-${Date.now()}`, type: "user", text }],
     }));
 
-    setTimeout(() => {
-      const reply = getMockResponse(currentAgent.type, text);
+    try {
+      const res = await authFetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, agentType: currentAgent.type }),
+      });
+      const json = await res.json();
+      const reply = json?.data?.content ?? "Agent response unavailable.";
+
       setAgentLogs((prev) => ({
         ...prev,
         [agentId]: [...(prev[agentId] ?? []), { id: `r-${Date.now()}`, type: "response", text: reply }],
       }));
+    } catch {
+      setAgentLogs((prev) => ({
+        ...prev,
+        [agentId]: [...(prev[agentId] ?? []), { id: `r-${Date.now()}`, type: "response", text: "Failed to reach AI service. Check your connection." }],
+      }));
+    } finally {
       setIsProcessing(false);
       inputRef.current?.focus();
-    }, 700);
+    }
   };
 
   return (
@@ -236,7 +281,7 @@ export default function AgentsPage() {
         <div className="h-4 w-px bg-zinc-200" />
         <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
           <Cpu className="h-3 w-3" />
-          <span>Compute: 12.4%</span>
+          <span>4 agents registered</span>
         </div>
         <div className="h-4 w-px bg-zinc-200" />
         <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchNotifications, type NotificationRecord } from "@/services/api/notifications";
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, type NotificationRecord } from "@/services/api/notifications";
 import { RowSkeleton, ErrorState, EmptyState } from "@/components/ui/page-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
@@ -69,22 +69,36 @@ export default function NotificationsPage() {
   const items: NotificationRecord[] = notifications ?? [];
   const unread = items.filter((n) => !n.read).length;
 
-  // ── Mark single as read (optimistic) ──────────────────────────────────────
+  // ── Mark single as read (optimistic + server sync) ────────────────────────
   const markRead = useMutation({
     mutationFn: async (id: string) => {
+      // Optimistic update
       qc.setQueryData<NotificationRecord[]>(["notifications"], (old) =>
         (old ?? []).map((n) => (n.id === id ? { ...n, read: true } : n))
       );
+      // Sync to DB
+      await markNotificationRead(id);
+    },
+    onError: () => {
+      // Revert on failure
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
-  // ── Mark all as read (optimistic) ─────────────────────────────────────────
+  // ── Mark all as read (optimistic + server sync) ────────────────────────────
   const markAllRead = useMutation({
     mutationFn: async () => {
+      // Optimistic update
       qc.setQueryData<NotificationRecord[]>(["notifications"], (old) =>
         (old ?? []).map((n) => ({ ...n, read: true }))
       );
+      // Sync to DB
+      await markAllNotificationsRead();
       toast.success("All notifications marked as read");
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      toast.error("Failed to update notifications.");
     },
   });
 

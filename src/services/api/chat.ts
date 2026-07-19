@@ -40,3 +40,19 @@ export async function sendChatMessage(
   const json = await res.json();
   return json.data;
 }
+
+export interface ConversationSummary {
+  id:           string;
+  title:        string;
+  lastMessage:  string;
+  timestamp:    string;
+  messageCount: number;
+  agentType:    string | null;
+}
+
+export async function fetchConversations(): Promise<ConversationSummary[]> {
+  const res = await authFetch(`${API}/conversations`);
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data ?? [];
+}

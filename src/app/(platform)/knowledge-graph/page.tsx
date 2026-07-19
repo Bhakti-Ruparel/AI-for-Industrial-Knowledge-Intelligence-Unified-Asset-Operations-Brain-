@@ -23,6 +23,7 @@ interface NodeItem {
   y:           number;
   description: string;
   meta:        string;
+  properties:  Record<string, unknown>;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -37,6 +38,8 @@ const nodeConfig: Record<string, { color: string; bg: string; badgeBg: string; i
   INCIDENT:   { color: "text-rose-600",    bg: "bg-rose-50 border-rose-200",     badgeBg: "bg-rose-500",    icon: ShieldAlert },
   person:     { color: "text-purple-600",  bg: "bg-purple-50 border-purple-200", badgeBg: "bg-purple-500",  icon: User        },
   PERSON:     { color: "text-purple-600",  bg: "bg-purple-50 border-purple-200", badgeBg: "bg-purple-500",  icon: User        },
+  maintenance: { color: "text-orange-600", bg: "bg-orange-50 border-orange-200", badgeBg: "bg-orange-500",  icon: Cpu        },
+  MAINTENANCE: { color: "text-orange-600", bg: "bg-orange-50 border-orange-200", badgeBg: "bg-orange-500",  icon: Cpu        },
 };
 const defaultNodeCfg = {
   color: "text-zinc-600", bg: "bg-zinc-50 border-zinc-200",
@@ -49,37 +52,79 @@ type NodeType = typeof NODE_TYPES[number];
 // ── Layout ────────────────────────────────────────────────────────────────────
 function assignPositions(nodes: { id: string; type: string; label: string; properties?: Record<string, unknown> }[]): NodeItem[] {
   const cols = Math.max(3, Math.ceil(Math.sqrt(nodes.length)));
-  return nodes.map((n, idx) => ({
-    id:          n.id,
-    label:       n.label,
-    type:        (n.type || "").toLowerCase(),
-    x:           120 + (idx % cols) * 180,
-    y:           120 + Math.floor(idx / cols) * 145,
-    description: (n.properties?.description as string) || `${n.type}: ${n.label}`,
-    meta:        (n.properties?.meta as string)         || "",
-  }));
+  const spacing = 190;
+  const startX = 160;
+  const startY = 140;
+
+  return nodes.map((n, idx) => {
+    const props = n.properties ?? {};
+    const type  = (n.type || "").toLowerCase();
+
+    // Generate human-readable description from properties
+    let description = "";
+    let meta = "";
+
+    switch (type) {
+      case "equipment":
+        description = props.model ? `${props.model}` : `Equipment: ${n.label}`;
+        if (props.location) description += ` — Located at ${props.location}`;
+        meta = [
+          props.status ? `Status: ${String(props.status).replace("_", " ")}` : "",
+          props.healthScore != null ? `Health: ${props.healthScore}%` : "",
+        ].filter(Boolean).join(" · ");
+        break;
+      case "document":
+        description = `Document uploaded to knowledge base`;
+        if (props.docType) description = `${String(props.docType).replace("_", " ")} document`;
+        meta = [
+          props.status ? `${String(props.status).toLowerCase()}` : "",
+          props.mimeType ? String(props.mimeType).split("/").pop() : "",
+        ].filter(Boolean).join(" · ");
+        break;
+      case "incident":
+        description = `Incident reported on equipment`;
+        meta = [
+          props.severity ? `Severity: ${props.severity}` : "",
+          props.status ? `Status: ${String(props.status).replace("_", " ")}` : "",
+        ].filter(Boolean).join(" · ");
+        break;
+      case "regulation":
+        description = `Regulatory compliance framework`;
+        if (props.category) description = `${String(props.category).replace("_", " ")} compliance`;
+        meta = [
+          props.status ? `${String(props.status).replace("_", " ")}` : "",
+          props.score != null ? `Score: ${props.score}%` : "",
+        ].filter(Boolean).join(" · ");
+        break;
+      case "person":
+        description = `Team member`;
+        if (props.role) description = `${String(props.role).replace("_", " ")} team member`;
+        meta = props.email ? String(props.email) : "";
+        break;
+      case "maintenance":
+        description = `Maintenance record`;
+        meta = [
+          props.type ? `Type: ${props.type}` : "",
+          props.status ? `Status: ${String(props.status).replace("_", " ")}` : "",
+        ].filter(Boolean).join(" · ");
+        break;
+      default:
+        description = (props.description as string) || `${n.type}: ${n.label}`;
+        meta = (props.meta as string) || "";
+    }
+
+    return {
+      id:    n.id,
+      label: n.label,
+      type,
+      x:     startX + (idx % cols) * spacing,
+      y:     startY + Math.floor(idx / cols) * 155,
+      description,
+      meta,
+      properties: props,
+    };
+  });
 }
-
-// ── Fallback static data ──────────────────────────────────────────────────────
-const fallbackNodes: NodeItem[] = [
-  { id: "1", label: "CVM-850",        type: "equipment",  x: 380, y: 200, description: "Vertical Machining Center, 800×500×450mm.", meta: "Status: Nominal"     },
-  { id: "2", label: "ISO 9001",       type: "regulation", x: 610, y: 240, description: "Quality management framework.",             meta: "Audited: June 2026"  },
-  { id: "3", label: "Spindle Manual", type: "document",   x: 310, y: 360, description: "Spindle torque curves and setup guide.",    meta: "Ver: 4.2"            },
-  { id: "4", label: "Bearing Wear",   type: "incident",   x: 680, y: 370, description: "Early bearing wear pattern detected.",      meta: "Severity: High"     },
-  { id: "5", label: "DYNAMILL-1200",  type: "equipment",  x: 560, y: 170, description: "Portal milling machine.",                  meta: "Status: Maintenance" },
-  { id: "6", label: "Monthly Report", type: "document",   x: 760, y: 230, description: "AI-compiled wear trends report.",           meta: "June 2026"           },
-  { id: "7", label: "J. Sharma",      type: "person",     x: 460, y: 440, description: "Senior maintenance engineer.",             meta: "Dept: Maintenance"   },
-];
-
-const fallbackEdges = [
-  { from: "1", to: "3", label: "Documented In" },
-  { from: "1", to: "2", label: "Governed By"   },
-  { from: "5", to: "2", label: "Governed By"   },
-  { from: "5", to: "6", label: "Logged In"     },
-  { from: "2", to: "4", label: "Violations"    },
-  { from: "7", to: "1", label: "Maintains"     },
-  { from: "7", to: "5", label: "Maintains"     },
-];
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function KnowledgeGraphPage() {
@@ -91,21 +136,21 @@ export default function KnowledgeGraphPage() {
   const toast = useToast();
 
   const { data: rawNodes, isLoading, isError, refetch } = useQuery({
-    queryKey: ["knowledge-graph"],
-    queryFn:  () => fetchGraphNodes("equipment"),
+    queryKey: ["knowledge-graph", searchQuery || "all"],
+    queryFn:  () => fetchGraphNodes(searchQuery || ""),
   });
 
   useEffect(() => {
-    if (isError) toast.warning("Knowledge graph unavailable", "Neo4j may not be configured. Showing sample data.");
+    if (isError) toast.warning("Knowledge graph", "Neo4j may not be configured. Showing data from Prisma.");
   }, [isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isUsingFallback = !rawNodes || rawNodes.length === 0;
+  const isUsingFallback = false; // No more fake data
 
   const allNodes: NodeItem[] = useMemo(
-    () => isUsingFallback ? fallbackNodes : assignPositions(rawNodes ?? []),
-    [isUsingFallback, rawNodes]
+    () => rawNodes && rawNodes.length > 0 ? assignPositions(rawNodes) : [],
+    [rawNodes]
   );
-  const allEdges = isUsingFallback ? fallbackEdges : [];
+  const allEdges: { from: string; to: string; label: string }[] = [];
 
   // ── Filtered nodes ────────────────────────────────────────────────────────
   const displayNodes = useMemo(() => {
@@ -152,16 +197,9 @@ export default function KnowledgeGraphPage() {
         title="Knowledge Graph"
         subtitle="Visualize relationships between equipment, documents, regulations, and people."
         badge={
-          <div className="flex items-center gap-2">
-            {isUsingFallback && (
-              <Badge variant="outline" className="text-xs px-3 py-1 bg-amber-50 border-amber-200 text-amber-700 font-semibold rounded-xl animate-pulse">
-                Sample Data
-              </Badge>
-            )}
-            <Badge variant="outline" className="text-xs px-3 py-1 bg-white border-zinc-200 text-zinc-700 font-semibold rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-              {allNodes.length} nodes · {allEdges.length} edges
-            </Badge>
-          </div>
+          <Badge variant="outline" className="text-xs px-3 py-1 bg-white border-zinc-200 text-zinc-700 font-semibold rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+            {allNodes.length} nodes · {allEdges.length} edges
+          </Badge>
         }
       />
 
@@ -169,16 +207,16 @@ export default function KnowledgeGraphPage() {
         non-blocking inline alert banner since we have beautiful static fallback data ready.
       */}
       {isError && (
-        <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-red-100 bg-red-50/50 text-[13px] text-red-800">
+        <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-amber-100 bg-amber-50/50 text-[13px] text-amber-800">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
-            <span><strong>Connection Failed:</strong> Unable to reach your database. Showing simulated offline model.</span>
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span><strong>Neo4j unavailable:</strong> Knowledge graph will show nodes from the Prisma database. Add nodes below or configure Neo4j for full graph traversal.</span>
           </div>
           <button 
             onClick={() => refetch()} 
-            className="px-3 py-1 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-xs"
+            className="px-3 py-1 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 transition-colors text-xs shrink-0"
           >
-            Retry Connection
+            Retry
           </button>
         </div>
       )}
@@ -376,8 +414,8 @@ export default function KnowledgeGraphPage() {
             <div className="rounded-xl border border-zinc-200/80 bg-white/95 backdrop-blur-sm px-4 py-2.5 flex items-center gap-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
               <Info className="h-4 w-4 text-[#FF6B2C] shrink-0" />
               <p className="text-[12px] text-zinc-500 font-medium">
-                {isUsingFallback
-                  ? "Showing sample data. Configure Neo4j to load real graph data."
+                {allNodes.length === 0
+                  ? "No nodes yet. Nodes are created automatically when documents are processed, or add them manually via the API."
                   : `Showing ${displayNodes.length} of ${allNodes.length} nodes. Click a node to inspect its relationships.`}
               </p>
             </div>
@@ -419,6 +457,27 @@ export default function KnowledgeGraphPage() {
                 <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">Context</p>
                 <p className="text-[12px] text-zinc-600 leading-relaxed">{selectedNode.description}</p>
               </div>
+
+              {/* Properties */}
+              {Object.keys(selectedNode.properties).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Properties</p>
+                  <div className="rounded-xl border border-zinc-100 overflow-hidden divide-y divide-zinc-50">
+                    {Object.entries(selectedNode.properties)
+                      .filter(([key, val]) => val != null && val !== "" && key !== "organizationId" && key !== "description" && key !== "meta")
+                      .map(([key, val]) => (
+                        <div key={key} className="flex items-center justify-between px-3.5 py-2 bg-white hover:bg-zinc-50/50 transition-colors">
+                          <span className="text-[11px] font-medium text-zinc-500 capitalize">
+                            {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}
+                          </span>
+                          <span className="text-[11px] font-semibold text-zinc-800 text-right max-w-[140px] truncate">
+                            {String(val).replace(/_/g, " ")}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               {/* Related edges */}
               {displayEdges.filter((e) => e.from === selectedNode.id || e.to === selectedNode.id).length > 0 && (
@@ -469,7 +528,7 @@ export default function KnowledgeGraphPage() {
           <div className="border-t border-zinc-100 px-5 py-3 flex items-center gap-2">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
             <span className="text-[11px] text-zinc-500 font-medium">
-              {isUsingFallback ? "Sample data — connect Neo4j for live graph" : "Live Neo4j data"}
+              {allNodes.length > 0 ? "Live data from database" : "No nodes — upload documents to build the graph"}
             </span>
           </div>
         </div>

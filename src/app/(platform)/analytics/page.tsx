@@ -63,8 +63,8 @@ function KpiCard({
             {positive
               ? <TrendingUp  className="h-3.5 w-3.5 text-emerald-500" />
               : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
-            <span className={cn("text-[12px] font-semibold", positive ? "text-emerald-600" : "text-red-500")}>
-              {change > 0 ? "+" : ""}{change}%
+            <span className={cn("text-[12px] font-semibold tabular-nums", positive ? "text-emerald-600" : "text-red-500")}>
+              {change}
             </span>
             <span className="text-[12px] text-zinc-400">{changeLabel}</span>
           </div>
@@ -128,12 +128,37 @@ export default function AnalyticsPage() {
   }, [isError, toast]);
 
   const kpis = metrics ? [
-    { title: "Equipment Uptime",    value: `${metrics.equipment.averageHealth}%`,      change:  2.1, positive: true,  changeLabel: "vs last month", icon: TrendingUp  },
-    { title: "Avg Resolution Time", value: `${metrics.incidents.mttr || 0} hrs`,       change: -15,  positive: false, changeLabel: "reduced",       icon: Clock       },
-    { title: "Maintenance Tasks",   value: String(metrics.maintenance.total),          change:  8,   positive: true,  changeLabel: "this month",    icon: Wrench      },
-    { title: "Docs Processed",      value: metrics.documents.indexed.toLocaleString(), change: 32,   positive: true,  changeLabel: "this week",     icon: FileText    },
-    { title: "AI Queries Today",    value: metrics.ai.queriesToday.toLocaleString(),   change: 18,   positive: true,  changeLabel: "vs yesterday",  icon: Bot         },
-    { title: "Compliance Score",    value: `${metrics.compliance.overallScore}%`,      change:  4,   positive: true,  changeLabel: "improvement",   icon: Shield      },
+    {
+      title:       "Equipment Uptime",
+      value:       `${metrics.equipment.averageHealth}%`,
+      change:      metrics.equipment.critical > 0 ? -metrics.equipment.critical : metrics.equipment.operational,
+      positive:    metrics.equipment.critical === 0,
+      changeLabel: metrics.equipment.critical > 0
+        ? `${metrics.equipment.critical} critical`
+        : `${metrics.equipment.operational} operational`,
+      icon: TrendingUp,
+    },
+    {
+      title:       "Avg Resolution Time",
+      value:       metrics.incidents.mttr > 0 ? `${metrics.incidents.mttr} hrs` : "—",
+      change:      metrics.incidents.resolved,
+      positive:    true,
+      changeLabel: `${metrics.incidents.resolved} resolved`,
+      icon: Clock,
+    },
+    {
+      title:       "Maintenance Tasks",
+      value:       String(metrics.maintenance.total),
+      change:      metrics.maintenance.overdue,
+      positive:    metrics.maintenance.overdue === 0,
+      changeLabel: metrics.maintenance.overdue > 0
+        ? `${metrics.maintenance.overdue} overdue`
+        : `${metrics.maintenance.completed} completed`,
+      icon: Wrench,
+    },
+    { title: "Docs Processed",   value: metrics.documents.indexed.toLocaleString(),  change: metrics.documents.processing, positive: metrics.documents.processing === 0, changeLabel: metrics.documents.processing > 0 ? `${metrics.documents.processing} processing` : `of ${metrics.documents.total} total`, icon: FileText },
+    { title: "AI Queries Today", value: metrics.ai.queriesToday.toLocaleString(),    change: metrics.ai.queriesTotal,              positive: true,                              changeLabel: `${metrics.ai.queriesTotal.toLocaleString()} total`,                                                                            icon: Bot      },
+    { title: "Compliance Score", value: `${metrics.compliance.overallScore}%`,       change: metrics.compliance.nonCompliant,      positive: metrics.compliance.nonCompliant === 0, changeLabel: metrics.compliance.nonCompliant > 0 ? `${metrics.compliance.nonCompliant} violations` : `${metrics.compliance.compliant} compliant`, icon: Shield },
   ] : [];
 
   const complianceData = metrics ? [
@@ -206,6 +231,12 @@ export default function AnalyticsPage() {
         <TabsContent value="equipment" className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
             <ChartCard title="Equipment Health Trend (30 days)" subtitle="Average health score across all machines" loading={lHealth} height={240}>
+              {healthTrend.length === 0 || healthTrend.every((d) => d.value === 0) ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <TrendingUp className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">Add equipment to see health trends.</p>
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={healthTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <defs>
@@ -224,10 +255,16 @@ export default function AnalyticsPage() {
                   <Area type="monotone" dataKey="value" stroke="#FF6B2C" strokeWidth={2} fill="url(#hGrad)" dot={false} activeDot={{ r: 4, fill: "#FF6B2C" }} />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </ChartCard>
 
             <ChartCard title="Status Distribution" loading={isLoading} height={240}>
-              {metrics && (
+              {metrics && metrics.equipment.total === 0 ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <Wrench className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">No equipment registered yet.</p>
+                </div>
+              ) : metrics && (
                 <div className="flex items-center justify-center gap-10 h-full">
                   {[
                     { label: "Operational",  value: metrics.equipment.operational, color: "#22C55E" },
@@ -251,6 +288,12 @@ export default function AnalyticsPage() {
         <TabsContent value="documents" className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
             <ChartCard title="Documents by Type" loading={lDocs} height={260}>
+              {docsByType.length === 0 ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <FileText className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">Upload documents to see type breakdown.</p>
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={docsByType} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
@@ -262,10 +305,16 @@ export default function AnalyticsPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </ChartCard>
 
             <ChartCard title="Index Status" loading={isLoading} height={260}>
-              {metrics && (
+              {metrics && metrics.documents.total === 0 ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <FileText className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">No documents uploaded yet.</p>
+                </div>
+              ) : metrics && (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -294,6 +343,12 @@ export default function AnalyticsPage() {
         {/* ── Maintenance ── */}
         <TabsContent value="maintenance" className="space-y-5">
           <ChartCard title="Maintenance Cost by Type (6 months)" subtitle="Breakdown of preventive, corrective, and predictive costs" loading={lCost} height={300}>
+            {maintCost.every((d) => d.preventive === 0 && d.corrective === 0 && d.predictive === 0) ? (
+              <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                <Wrench className="h-8 w-8 text-zinc-200" />
+                <p className="text-[12px] text-zinc-400">No maintenance cost data yet. Complete maintenance tasks with cost entries to populate this chart.</p>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={maintCost} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
@@ -306,12 +361,23 @@ export default function AnalyticsPage() {
                 <Bar dataKey="predictive" name="Predictive"  stackId="a" fill="#3B82F6" radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            )}
           </ChartCard>
         </TabsContent>
 
         {/* ── Incidents ── */}
         <TabsContent value="incidents" className="space-y-5">
+<<<<<<< HEAD
           <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the the past month" loading={lIncident} height={300}>
+=======
+          <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the past month" loading={lIncident} height={300}>
+            {incidentTrend.every((d) => d.value === 0) ? (
+              <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                <TrendingDown className="h-8 w-8 text-zinc-200" />
+                <p className="text-[12px] text-zinc-400">No incidents reported in the last 30 days.</p>
+              </div>
+            ) : (
+>>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={incidentTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
@@ -327,6 +393,7 @@ export default function AnalyticsPage() {
                 <Line type="monotone" dataKey="value" name="Incidents" stroke="#EF4444" strokeWidth={2.5} dot={{ r: 3, fill: "#EF4444" }} activeDot={{ r: 5 }} animationDuration={1200} />
               </LineChart>
             </ResponsiveContainer>
+            )}
           </ChartCard>
         </TabsContent>
 
@@ -346,9 +413,9 @@ export default function AnalyticsPage() {
                 </ResponsiveContainer>
               )}
               {metrics && complianceData.length === 0 && (
-                <div className="flex h-full items-center justify-center flex-col gap-2">
-                  <p className="text-2xl font-bold text-emerald-600">All Clear</p>
-                  <p className="text-sm text-zinc-400">No compliance issues detected</p>
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <Shield className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">Add compliance records to see status breakdown.</p>
                 </div>
               )}
             </ChartCard>

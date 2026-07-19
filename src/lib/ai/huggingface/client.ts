@@ -13,25 +13,34 @@ const HF_API = "https://api-inference.huggingface.co/models";
 export async function generateText(prompt: string, model?: string): Promise<string> {
   const modelId = model || config.huggingface.chatModel;
 
-  const response = await fetch(`${HF_API}/${modelId}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.huggingface.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      inputs: prompt,
-      parameters: { max_new_tokens: 2048, temperature: 0.3, return_full_text: false },
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000); // 30s timeout
 
-  if (!response.ok) {
-    logger.error({ status: response.status, model: modelId }, "HF inference failed");
-    throw new ServiceUnavailableError("Hugging Face Inference");
+  try {
+    const response = await fetch(`${HF_API}/${modelId}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.huggingface.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        inputs: prompt,
+        parameters: { max_new_tokens: 1024, temperature: 0.3, return_full_text: false },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      logger.error({ status: response.status, model: modelId, body: errBody.slice(0, 200) }, "HF inference failed");
+      throw new ServiceUnavailableError("Hugging Face Inference");
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data[0]?.generated_text || "" : data.generated_text || "";
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = await response.json();
-  return Array.isArray(data) ? data[0]?.generated_text || "" : data.generated_text || "";
 }
 
 export async function generateEmbedding(text: string): Promise<number[]> {

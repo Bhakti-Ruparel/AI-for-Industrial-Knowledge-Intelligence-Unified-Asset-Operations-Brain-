@@ -29,7 +29,7 @@ export const config = {
   huggingface: {
     apiKey: process.env.HUGGINGFACE_API_KEY || "",
     embeddingModel: process.env.HF_EMBEDDING_MODEL || "sentence-transformers/all-MiniLM-L6-v2",
-    chatModel: process.env.HF_CHAT_MODEL || "mistralai/Mistral-7B-Instruct-v0.2",
+    chatModel: process.env.HF_CHAT_MODEL || "HuggingFaceH4/zephyr-7b-beta",
   },
   whatsapp: {
     enabled: process.env.WHATSAPP_ENABLED === "true",

@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Chat Service — AI Copilot conversation management
+// Chat Service — AI Copilot conversation management with DB persistence
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { executeRAG } from "@/lib/ai/rag/pipeline";
+import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/utils/logger";
 
 const logger = createLogger("chat-service");
@@ -30,22 +31,78 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
   logger.info({ userId, agentType, messageLength: message.length }, "Chat request received");
 
-  // Execute RAG pipeline
-  const ragResult = await executeRAG({
-    question: message,
-    organizationId,
-  });
+  // ── Resolve or create conversation ────────────────────────────────────────
+  let resolvedConversationId = conversationId;
+  if (prisma) {
+    try {
+      if (conversationId) {
+        // Verify it exists and belongs to this user/org
+        const existing = await prisma.conversation.findFirst({
+          where: { id: conversationId, userId, organizationId, deletedAt: null },
+        });
+        if (!existing) resolvedConversationId = undefined; // Reset — will create new
+      }
+      if (!resolvedConversationId) {
+        const conv = await prisma.conversation.create({
+          data: {
+            userId,
+            organizationId,
+            agentType: agentType ?? null,
+            title: message.slice(0, 80),
+          },
+        });
+        resolvedConversationId = conv.id;
+      }
 
-  // Generate suggested actions based on content
+      // Save user message
+      await prisma.message.create({
+        data: {
+          conversationId: resolvedConversationId!,
+          role: "USER",
+          content: message,
+          metadata: agentType ? { agentType } : undefined,
+        },
+      });
+    } catch (err) {
+      logger.warn({ err }, "Failed to persist user message — continuing without DB");
+    }
+  }
+
+  if (!resolvedConversationId) {
+    resolvedConversationId = `conv_${Date.now()}`;
+  }
+
+  // ── Execute RAG pipeline ──────────────────────────────────────────────────
+  const ragResult = await executeRAG({ question: message, organizationId });
   const actions = generateActions(ragResult.answer, agentType);
-
-  // TODO: Save conversation and messages to DB when Prisma is connected
-  const newConversationId = conversationId || `conv_${Date.now()}`;
   const messageId = `msg_${Date.now()}`;
+
+  // ── Save assistant message ────────────────────────────────────────────────
+  if (prisma && !resolvedConversationId.startsWith("conv_")) {
+    try {
+      const saved = await prisma.message.create({
+        data: {
+          conversationId: resolvedConversationId,
+          role: "ASSISTANT",
+          content: ragResult.answer,
+          confidence: ragResult.confidence,
+          sources: ragResult.sources as any,
+          metadata: { agentUsed: agentType ?? "knowledge" },
+        },
+      });
+      // Update conversation updatedAt by touching it
+      await prisma.conversation.update({
+        where: { id: resolvedConversationId },
+        data: { updatedAt: new Date() },
+      });
+    } catch (err) {
+      logger.warn({ err }, "Failed to persist assistant message");
+    }
+  }
 
   return {
     messageId,
-    conversationId: newConversationId,
+    conversationId: resolvedConversationId,
     content: ragResult.answer,
     confidence: ragResult.confidence,
     sources: ragResult.sources,
@@ -56,7 +113,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
 
 function generateActions(answer: string, agentType?: string): { type: string; label: string }[] {
   const actions: { type: string; label: string }[] = [];
-
   if (answer.toLowerCase().includes("maintenance")) {
     actions.push({ type: "create_maintenance", label: "Create Maintenance Plan" });
   }
@@ -66,7 +122,6 @@ function generateActions(answer: string, agentType?: string): { type: string; la
   if (answer.toLowerCase().includes("failure") || answer.toLowerCase().includes("incident")) {
     actions.push({ type: "generate_rca", label: "Generate RCA" });
   }
-
   actions.push({ type: "open_graph", label: "View in Knowledge Graph" });
   return actions;
 }

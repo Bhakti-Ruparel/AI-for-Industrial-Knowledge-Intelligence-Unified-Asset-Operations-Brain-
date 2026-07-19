@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchMaintenance, type MaintenanceRecord } from "@/services/api/maintenance";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchMaintenance, createMaintenanceRecord, type MaintenanceRecord } from "@/services/api/maintenance";
+import { fetchEquipment } from "@/services/api/equipment";
 import { RowSkeleton, ErrorState, EmptyState } from "@/components/ui/page-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
@@ -10,7 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   Calendar, CheckCircle2, Clock, AlertTriangle,
   Wrench, ArrowUpRight, Bot, LayoutList, Columns3,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Plus, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,248 @@ const LIST_TABS = ["ALL", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "OVERDUE"] as
 type ListTab = (typeof LIST_TABS)[number];
 
 type ViewMode = "list" | "kanban";
+
+// ── Add Maintenance Task Modal ────────────────────────────────────────────────
+interface AddTaskModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+function AddTaskModal({ open, onClose }: AddTaskModalProps) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: eqData } = useQuery({
+    queryKey: ["equipment"],
+    queryFn:  () => fetchEquipment(1, 100),
+  });
+  const equipment = (eqData?.data ?? []) as { id: string; name: string }[];
+
+  const [form, setForm] = useState({
+    equipmentId:   "",
+    type:          "PREVENTIVE" as "PREVENTIVE" | "CORRECTIVE" | "PREDICTIVE" | "EMERGENCY",
+    priority:      "MEDIUM" as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+    title:         "",
+    description:   "",
+    scheduledDate: "",
+    estimatedHours: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const mutation = useMutation({
+    mutationFn: () => createMaintenanceRecord({
+      ...form,
+      scheduledDate:  new Date(form.scheduledDate).toISOString(),
+      estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : undefined,
+    } as Partial<MaintenanceRecord>),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["maintenance"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      toast.success("Maintenance task scheduled");
+      setForm({ equipmentId: "", type: "PREVENTIVE", priority: "MEDIUM", title: "", description: "", scheduledDate: "", estimatedHours: "" });
+      setErrors({});
+      onClose();
+    },
+    onError: () => {
+      toast.error("Failed to create maintenance task.");
+    },
+  });
+
+  function validate() {
+    const e: Record<string, string> = {};
+    if (!form.title.trim())       e.title         = "Title is required";
+    if (!form.equipmentId)        e.equipmentId   = "Equipment is required";
+    if (!form.scheduledDate)      e.scheduledDate = "Scheduled date is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  function handleSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!validate()) return;
+    mutation.mutate();
+  }
+
+  if (!open) return null;
+
+  const typeOptions = [
+    { value: "PREVENTIVE", label: "Preventive" },
+    { value: "CORRECTIVE",  label: "Corrective"  },
+    { value: "PREDICTIVE",  label: "Predictive"  },
+    { value: "EMERGENCY",   label: "Emergency"   },
+  ] as const;
+
+  const priorityColors: Record<string, string> = {
+    LOW:      "border-blue-300 bg-blue-50 text-blue-700",
+    MEDIUM:   "border-zinc-300 bg-zinc-50 text-zinc-700",
+    HIGH:     "border-orange-300 bg-orange-50 text-orange-700",
+    CRITICAL: "border-red-300 bg-red-50 text-red-700",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[16px] font-bold text-zinc-900">Schedule Maintenance Task</h2>
+            <p className="text-[12px] text-zinc-400 mt-0.5">Create a new work order for preventive or corrective maintenance.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-all"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Equipment */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Equipment <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.equipmentId}
+              onChange={(e) => setForm((f) => ({ ...f, equipmentId: e.target.value }))}
+              className={cn(
+                "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 bg-white",
+                "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                errors.equipmentId ? "border-red-400" : "border-zinc-200"
+              )}
+            >
+              <option value="">Select equipment…</option>
+              {equipment.map((eq) => (
+                <option key={eq.id} value={eq.id}>{eq.name}</option>
+              ))}
+            </select>
+            {errors.equipmentId && <p className="text-[11px] text-red-500 mt-1">{errors.equipmentId}</p>}
+          </div>
+
+          {/* Title */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Task Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. Spindle bearing inspection"
+              className={cn(
+                "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300",
+                "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                errors.title ? "border-red-400" : "border-zinc-200"
+              )}
+            />
+            {errors.title && <p className="text-[11px] text-red-500 mt-1">{errors.title}</p>}
+          </div>
+
+          {/* Type + Priority */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Type</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as typeof form.type }))}
+                className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
+              >
+                {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Priority</label>
+              <select
+                value={form.priority}
+                onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as typeof form.priority }))}
+                className={cn(
+                  "w-full rounded-xl border px-3.5 py-2.5 text-[13px] font-semibold bg-white",
+                  "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                  priorityColors[form.priority]
+                )}
+              >
+                {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Scheduled date + estimated hours */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                Scheduled Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={form.scheduledDate}
+                onChange={(e) => setForm((f) => ({ ...f, scheduledDate: e.target.value }))}
+                min={new Date().toISOString().split("T")[0]}
+                className={cn(
+                  "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900",
+                  "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                  errors.scheduledDate ? "border-red-400" : "border-zinc-200"
+                )}
+              />
+              {errors.scheduledDate && <p className="text-[11px] text-red-500 mt-1">{errors.scheduledDate}</p>}
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                Est. Hours
+              </label>
+              <input
+                type="number"
+                min="0.5"
+                step="0.5"
+                value={form.estimatedHours}
+                onChange={(e) => setForm((f) => ({ ...f, estimatedHours: e.target.value }))}
+                placeholder="e.g. 4"
+                className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Description
+            </label>
+            <textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Work to be done, parts needed, safety precautions…"
+              className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 resize-none focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-zinc-200 px-4 py-2.5 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-50 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="flex-1 rounded-xl bg-[#FF6B2C] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#FF824E] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {mutation.isPending ? (
+                <span className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              ) : (
+                <Calendar className="h-3.5 w-3.5" />
+              )}
+              {mutation.isPending ? "Scheduling…" : "Schedule Task"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // ── Task card (list view) ─────────────────────────────────────────────────────
 function TaskRow({ task }: { task: MaintenanceRecord }) {
@@ -262,6 +505,7 @@ export default function MaintenancePage() {
   const [activeTab,  setActiveTab]  = useState<ListTab>("ALL");
   const [viewMode,   setViewMode]   = useState<ViewMode>("list");
   const [search,     setSearch]     = useState("");
+  const [showModal,  setShowModal]  = useState(false);
   const toast = useToast();
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -302,6 +546,14 @@ export default function MaintenancePage() {
         subtitle="Track work orders, scheduled services, and AI-powered maintenance recommendations."
         action={
           <div className="flex items-center gap-2">
+            {/* Add task button */}
+            <button
+              onClick={() => setShowModal(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#FF6B2C] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#FF824E] transition-all shadow-[0_2px_8px_rgba(255,107,44,0.3)] active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" />
+              Add Task
+            </button>
             {/* View toggle */}
             <div className="flex items-center rounded-xl border border-zinc-200 bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
               <button
@@ -421,6 +673,9 @@ export default function MaintenancePage() {
           )}
         </>
       )}
+
+      {/* Add task modal */}
+      <AddTaskModal open={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
 }

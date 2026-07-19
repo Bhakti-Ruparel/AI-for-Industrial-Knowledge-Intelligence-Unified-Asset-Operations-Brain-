@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchEquipment } from "@/services/api/equipment";
 import { CardGridSkeleton, EmptyState } from "@/components/ui/page-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
-import { useToast } from "@/components/ui/toast";
 import {
   Wrench, FileText, Calendar, SlidersHorizontal,
   MapPin, Tag, TrendingUp, TrendingDown, Activity, AlertCircle, RefreshCw
@@ -26,34 +25,6 @@ interface ApiEquipment {
   nextMaintenance?: string;
   documents?:      unknown[];
 }
-
-// ── Offline Fallback Sample Data ──────────────────────────────────────────────
-const SAMPLE_EQUIPMENT: ApiEquipment[] = [
-  {
-    id: "eq-1",
-    name: "CVM-850",
-    model: "Vertical Machining Center",
-    series: "CVM Series",
-    category: "Equipment",
-    status: "operational",
-    healthScore: 92,
-    location: "Bay 1",
-    nextMaintenance: "2026-08-12",
-    documents: [{}, {}, {}],
-  },
-  {
-    id: "eq-2",
-    name: "DYNAMILL-1200",
-    model: "High Speed Milling Machine",
-    series: "Dynamill Series",
-    category: "Equipment",
-    status: "maintenance",
-    healthScore: 68,
-    location: "Bay 3",
-    nextMaintenance: "2026-07-20",
-    documents: [{}],
-  }
-];
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; dot: string; text: string; bg: string }> = {
@@ -197,7 +168,6 @@ function EquipmentCard({ eq }: { eq: ApiEquipment }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function EquipmentPage() {
   const [search, setSearch] = useState("");
-  const toast = useToast();
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["equipment"],
@@ -205,21 +175,10 @@ export default function EquipmentPage() {
     retry: 1,
   });
 
-  // Determine if backend data is missing/failed (Trigger fallback if error or if DB returns nothing)
+  // Use real data only — no hardcoded fallback
   const apiData = data?.data as unknown as ApiEquipment[] | undefined;
-  const isOffline = isError || (!isLoading && (!apiData || apiData.length === 0));
-
-  useEffect(() => {
-    if (isOffline && !isLoading) {
-      toast.error(
-        "Database connection failed", 
-        "Unable to reach server. Showing simulated offline model."
-      );
-    }
-  }, [isOffline, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Use fallback dummy data if the database connection is broken/empty
-  const equipment = isOffline ? SAMPLE_EQUIPMENT : (apiData ?? []);
+  const equipment = apiData ?? [];
+  const isOffline = isError;
 
   const filtered = equipment.filter((e) =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -259,7 +218,7 @@ export default function EquipmentPage() {
         }
       />
 
-      {/* ── Offline Alert Banner (Matches Knowledge Graph banner style!) ── */}
+      {/* ── DB error banner ── */}
       {isOffline && !isLoading && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50/50 p-4 transition-all animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-3">
@@ -268,7 +227,7 @@ export default function EquipmentPage() {
             </div>
             <div>
               <p className="text-[13px] font-bold text-red-900">
-                Connection Failed: <span className="font-medium text-red-700">Unable to reach your database. Showing simulated offline model.</span>
+                Connection Failed — <span className="font-medium text-red-700">Unable to reach the database. Check your connection and retry.</span>
               </p>
             </div>
           </div>
@@ -278,7 +237,7 @@ export default function EquipmentPage() {
             className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-[12px] font-bold text-white hover:bg-red-700 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", isRefetching && "animate-spin")} />
-            {isRefetching ? "Connecting..." : "Retry Connection"}
+            {isRefetching ? "Connecting…" : "Retry Connection"}
           </button>
         </div>
       )}

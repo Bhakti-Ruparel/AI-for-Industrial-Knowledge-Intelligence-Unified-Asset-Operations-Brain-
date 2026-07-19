@@ -4,11 +4,9 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { equipmentRepository } from "@/repositories";
+import { prisma } from "@/lib/prisma";
 import { filterMachines, getMachineData } from "@/services/machines";
-import { createLogger } from "@/utils/logger";
 import type { PaginationOptions } from "@/repositories";
-
-const logger = createLogger("equipment-service");
 
 export async function getEquipmentList(organizationId: string, options: PaginationOptions) {
   return equipmentRepository.findMany(organizationId, options);
@@ -35,14 +33,25 @@ export async function getCriticalEquipment(organizationId: string) {
 }
 
 export async function getEquipmentHealthSummary(organizationId: string) {
-  // TODO: Aggregate health scores from DB
+  const [total, operational, maintenance, critical, offline, healthAgg] = await Promise.all([
+    equipmentRepository.count(organizationId),
+    equipmentRepository.count(organizationId, { status: "OPERATIONAL" }),
+    equipmentRepository.count(organizationId, { status: "MAINTENANCE" }),
+    equipmentRepository.count(organizationId, { status: "CRITICAL" }),
+    equipmentRepository.count(organizationId, { status: "OFFLINE" }),
+    prisma ? (prisma as any).equipment.aggregate({
+      where: { organizationId, deletedAt: null },
+      _avg: { healthScore: true },
+    }) : { _avg: { healthScore: null } },
+  ]);
+
   return {
-    total: 24,
-    operational: 18,
-    maintenance: 3,
-    critical: 2,
-    offline: 1,
-    averageHealth: 82,
+    total,
+    operational,
+    maintenance,
+    critical,
+    offline,
+    averageHealth: Math.round(healthAgg._avg?.healthScore ?? 0),
   };
 }
 

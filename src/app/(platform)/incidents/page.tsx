@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchIncidents, type IncidentRecord } from "@/services/api/incidents";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchIncidents, createIncident, type IncidentRecord,
+} from "@/services/api/incidents";
+import { fetchEquipment } from "@/services/api/equipment";
 import { RowSkeleton, ErrorState, EmptyState } from "@/components/ui/page-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
@@ -10,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   AlertTriangle, Clock, CheckCircle, FileImage,
   FileText, Database, ArrowUpRight, ChevronDown, ChevronUp,
+  Plus, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,10 +28,10 @@ const severityConfig: Record<string, { color: string; bg: string; border: string
 const statusConfig: Record<string, {
   icon: typeof AlertTriangle; bg: string; text: string; label: string;
 }> = {
-  OPEN:          { icon: AlertTriangle, bg: "bg-red-50 text-red-700",       text: "text-red-700",     label: "Open"          },
-  INVESTIGATING: { icon: Clock,         bg: "bg-amber-50 text-amber-700",   text: "text-amber-700",   label: "Investigating" },
-  RESOLVED:      { icon: CheckCircle,   bg: "bg-emerald-50 text-emerald-700", text: "text-emerald-700", label: "Resolved"    },
-  CLOSED:        { icon: CheckCircle,   bg: "bg-zinc-100 text-zinc-600",    text: "text-zinc-600",    label: "Closed"        },
+  OPEN:          { icon: AlertTriangle, bg: "bg-red-50 text-red-700",         text: "text-red-700",     label: "Open"          },
+  INVESTIGATING: { icon: Clock,         bg: "bg-amber-50 text-amber-700",     text: "text-amber-700",   label: "Investigating" },
+  RESOLVED:      { icon: CheckCircle,   bg: "bg-emerald-50 text-emerald-700", text: "text-emerald-700", label: "Resolved"      },
+  CLOSED:        { icon: CheckCircle,   bg: "bg-zinc-100 text-zinc-600",      text: "text-zinc-600",    label: "Closed"        },
 };
 
 const TABS = [
@@ -46,11 +50,208 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+// ── Report Incident Modal ─────────────────────────────────────────────────────
+interface ReportModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function ReportIncidentModal({ open, onClose, onSuccess }: ReportModalProps) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: eqData } = useQuery({
+    queryKey: ["equipment"],
+    queryFn:  () => fetchEquipment(1, 100),
+  });
+  const equipment = (eqData?.data ?? []) as { id: string; name: string }[];
+
+  const [form, setForm] = useState({
+    title:       "",
+    description: "",
+    equipmentId: "",
+    severity:    "MEDIUM" as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const mutation = useMutation({
+    mutationFn: (data: typeof form) => createIncident(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      toast.success("Incident reported successfully");
+      setForm({ title: "", description: "", equipmentId: "", severity: "MEDIUM" });
+      setErrors({});
+      onSuccess();
+      onClose();
+    },
+    onError: () => {
+      toast.error("Failed to report incident. Please try again.");
+    },
+  });
+
+  function validate() {
+    const e: Record<string, string> = {};
+    if (!form.title.trim())       e.title       = "Title is required";
+    if (!form.description.trim()) e.description = "Description is required";
+    if (!form.equipmentId)        e.equipmentId = "Equipment is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  function handleSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!validate()) return;
+    mutation.mutate(form);
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[16px] font-bold text-zinc-900">Report Incident</h2>
+            <p className="text-[12px] text-zinc-400 mt-0.5">Log a new equipment failure or operational incident.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-all"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Incident Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. Spindle vibration at high speed"
+              className={cn(
+                "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300",
+                "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                errors.title ? "border-red-400" : "border-zinc-200"
+              )}
+            />
+            {errors.title && <p className="text-[11px] text-red-500 mt-1">{errors.title}</p>}
+          </div>
+
+          {/* Equipment */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Equipment <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.equipmentId}
+              onChange={(e) => setForm((f) => ({ ...f, equipmentId: e.target.value }))}
+              className={cn(
+                "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900",
+                "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all bg-white",
+                errors.equipmentId ? "border-red-400" : "border-zinc-200"
+              )}
+            >
+              <option value="">Select equipment…</option>
+              {equipment.map((eq) => (
+                <option key={eq.id} value={eq.id}>{eq.name}</option>
+              ))}
+            </select>
+            {errors.equipmentId && <p className="text-[11px] text-red-500 mt-1">{errors.equipmentId}</p>}
+          </div>
+
+          {/* Severity */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Severity <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((s) => {
+                const cfg = severityConfig[s];
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, severity: s }))}
+                    className={cn(
+                      "rounded-xl border px-2 py-2 text-[11px] font-bold uppercase tracking-wider transition-all",
+                      form.severity === s
+                        ? cn(cfg.bg, cfg.color, cfg.border, "ring-2 ring-offset-1", s === "CRITICAL" ? "ring-red-400" : s === "HIGH" ? "ring-orange-400" : s === "MEDIUM" ? "ring-amber-400" : "ring-blue-400")
+                        : "border-zinc-200 text-zinc-400 hover:border-zinc-300 bg-white"
+                    )}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Description <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Describe the incident in detail — what happened, when, observed symptoms…"
+              className={cn(
+                "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 resize-none",
+                "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                errors.description ? "border-red-400" : "border-zinc-200"
+              )}
+            />
+            {errors.description && <p className="text-[11px] text-red-500 mt-1">{errors.description}</p>}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-zinc-200 px-4 py-2.5 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-50 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="flex-1 rounded-xl bg-[#FF6B2C] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#FF824E] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {mutation.isPending ? (
+                <span className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              ) : (
+                <AlertTriangle className="h-3.5 w-3.5" />
+              )}
+              {mutation.isPending ? "Reporting…" : "Report Incident"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Incident row ──────────────────────────────────────────────────────────────
 function IncidentRow({ incident }: { incident: IncidentRecord }) {
   const [expanded, setExpanded] = useState(false);
-  const severity  = severityConfig[incident.severity] ?? severityConfig["MEDIUM"];
-  const status    = statusConfig[incident.status]   ?? statusConfig["OPEN"];
+  const severity   = severityConfig[incident.severity] ?? severityConfig["MEDIUM"];
+  const status     = statusConfig[incident.status]     ?? statusConfig["OPEN"];
   const StatusIcon = status.icon;
   const evidence   = incident.evidence ?? [];
   const timeline   = incident.timeline ?? [];
@@ -181,6 +382,7 @@ function IncidentRow({ incident }: { incident: IncidentRecord }) {
 export default function IncidentsPage() {
   const [activeTab, setActiveTab] = useState("ALL");
   const [search,    setSearch]    = useState("");
+  const [showModal, setShowModal] = useState(false);
   const toast = useToast();
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -228,6 +430,15 @@ export default function IncidentsPage() {
               {activeCount} active
             </span>
           ) : undefined
+        }
+        action={
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 rounded-2xl bg-[#FF6B2C] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#FF824E] transition-all shadow-[0_2px_8px_rgba(255,107,44,0.3)] active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4" />
+            Report Incident
+          </button>
         }
       />
 
@@ -286,8 +497,12 @@ export default function IncidentsPage() {
           {filtered.length === 0 && (
             <EmptyState
               icon={<AlertTriangle className="h-6 w-6" />}
-              title={search || activeTab !== "ALL" ? "No incidents matched your filters." : "No incidents reported."}
-              description="All incidents will appear here once logged."
+              title={search || activeTab !== "ALL" ? "No incidents matched your filters." : "No incidents reported yet."}
+              description={
+                search || activeTab !== "ALL"
+                  ? "Try adjusting your search or filters."
+                  : "All incidents will appear here once logged. Use the button above to report one."
+              }
             />
           )}
 
@@ -297,6 +512,13 @@ export default function IncidentsPage() {
           </div>
         </>
       )}
+
+      {/* Report incident modal */}
+      <ReportIncidentModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onSuccess={() => {}}
+      />
     </div>
   );
 }

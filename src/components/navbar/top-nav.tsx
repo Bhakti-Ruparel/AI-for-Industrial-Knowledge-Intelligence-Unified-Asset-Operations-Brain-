@@ -7,7 +7,8 @@ import { Bell, Search, Plus, ChevronDown, LogOut, User, Settings } from "lucide-
 import { useStore } from "@/hooks/use-store";
 import { useAuthStore } from "@/hooks/use-auth-store";
 import { getSupabaseBrowser } from "@/lib/database/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { fetchNotifications } from "@/services/api/notifications";
 
 function getInitials(name: string): string {
   return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
@@ -26,13 +27,20 @@ function roleLabel(role: string): string {
 }
 
 export function TopNav() {
-  const { notifications, setCommandOpen } = useStore();
+  const { setCommandOpen } = useStore();
   const { user, clearAuth } = useAuthStore();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const unread = notifications.filter((n) => !n.read).length;
+  // Real unread count from DB
+  const { data: notificationsData } = useQuery({
+    queryKey: ["notifications"],
+    queryFn:  fetchNotifications,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+  const unread = (notificationsData ?? []).filter((n) => !n.read).length;
   const initials = user ? getInitials(user.name) : "?";
 
   const handleLogout = async () => {

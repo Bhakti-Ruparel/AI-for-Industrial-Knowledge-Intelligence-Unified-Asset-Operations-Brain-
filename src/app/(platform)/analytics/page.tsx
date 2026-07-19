@@ -57,8 +57,8 @@ function KpiCard({
             {positive
               ? <TrendingUp  className="h-3.5 w-3.5 text-emerald-500" />
               : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
-            <span className={cn("text-[12px] font-semibold", positive ? "text-emerald-600" : "text-red-500")}>
-              {change > 0 ? "+" : ""}{change}%
+            <span className={cn("text-[12px] font-semibold tabular-nums", positive ? "text-emerald-600" : "text-red-500")}>
+              {change}
             </span>
             <span className="text-[12px] text-zinc-400">{changeLabel}</span>
           </div>
@@ -120,12 +120,37 @@ export default function AnalyticsPage() {
   }, [isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kpis = metrics ? [
-    { title: "Equipment Uptime",    value: `${metrics.equipment.averageHealth}%`,      change:  2.1, positive: true,  changeLabel: "vs last month", icon: TrendingUp  },
-    { title: "Avg Resolution Time", value: `${metrics.incidents.mttr || 0} hrs`,       change: -15,  positive: false, changeLabel: "reduced",       icon: Clock       },
-    { title: "Maintenance Tasks",   value: String(metrics.maintenance.total),          change:  8,   positive: true,  changeLabel: "this month",    icon: Wrench      },
-    { title: "Docs Processed",      value: metrics.documents.indexed.toLocaleString(), change: 32,   positive: true,  changeLabel: "this week",     icon: FileText    },
-    { title: "AI Queries Today",    value: metrics.ai.queriesToday.toLocaleString(),   change: 18,   positive: true,  changeLabel: "vs yesterday",  icon: Bot         },
-    { title: "Compliance Score",    value: `${metrics.compliance.overallScore}%`,      change:  4,   positive: true,  changeLabel: "improvement",   icon: Shield      },
+    {
+      title:       "Equipment Uptime",
+      value:       `${metrics.equipment.averageHealth}%`,
+      change:      metrics.equipment.critical > 0 ? -metrics.equipment.critical : metrics.equipment.operational,
+      positive:    metrics.equipment.critical === 0,
+      changeLabel: metrics.equipment.critical > 0
+        ? `${metrics.equipment.critical} critical`
+        : `${metrics.equipment.operational} operational`,
+      icon: TrendingUp,
+    },
+    {
+      title:       "Avg Resolution Time",
+      value:       metrics.incidents.mttr > 0 ? `${metrics.incidents.mttr} hrs` : "—",
+      change:      metrics.incidents.resolved,
+      positive:    true,
+      changeLabel: `${metrics.incidents.resolved} resolved`,
+      icon: Clock,
+    },
+    {
+      title:       "Maintenance Tasks",
+      value:       String(metrics.maintenance.total),
+      change:      metrics.maintenance.overdue,
+      positive:    metrics.maintenance.overdue === 0,
+      changeLabel: metrics.maintenance.overdue > 0
+        ? `${metrics.maintenance.overdue} overdue`
+        : `${metrics.maintenance.completed} completed`,
+      icon: Wrench,
+    },
+    { title: "Docs Processed",   value: metrics.documents.indexed.toLocaleString(),  change: metrics.documents.processing, positive: metrics.documents.processing === 0, changeLabel: metrics.documents.processing > 0 ? `${metrics.documents.processing} processing` : `of ${metrics.documents.total} total`, icon: FileText },
+    { title: "AI Queries Today", value: metrics.ai.queriesToday.toLocaleString(),    change: metrics.ai.queriesTotal,              positive: true,                              changeLabel: `${metrics.ai.queriesTotal.toLocaleString()} total`,                                                                            icon: Bot      },
+    { title: "Compliance Score", value: `${metrics.compliance.overallScore}%`,       change: metrics.compliance.nonCompliant,      positive: metrics.compliance.nonCompliant === 0, changeLabel: metrics.compliance.nonCompliant > 0 ? `${metrics.compliance.nonCompliant} violations` : `${metrics.compliance.compliant} compliant`, icon: Shield },
   ] : [];
 
   const complianceData = metrics ? [

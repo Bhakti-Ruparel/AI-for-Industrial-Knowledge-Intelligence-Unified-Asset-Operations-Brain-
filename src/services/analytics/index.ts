@@ -174,14 +174,26 @@ export async function getDashboardMetrics(organizationId: string): Promise<Dashb
 }
 
 export async function getEquipmentHealthTrend(organizationId: string, days = 30) {
-  // Equipment doesn't have a time-series health table yet — return a synthetic trend
-  // based on current average health with slight variance for UX
+  // No time-series health table yet — derive a stable trend from current average
+  // with minor variance based on incident/maintenance pressure (not random noise)
   const metrics = await getDashboardMetrics(organizationId);
-  const baseHealth = metrics.equipment.averageHealth || 75;
+  const baseHealth = metrics.equipment.averageHealth || 0;
+
+  // If no equipment exists yet, return empty trend
+  if (metrics.equipment.total === 0) {
+    return Array.from({ length: days }, (_, i) => ({
+      date:  new Date(Date.now() - (days - i - 1) * 86_400_000).toISOString().split("T")[0],
+      value: 0,
+    }));
+  }
+
+  // Apply a deterministic pressure factor: more overdue/critical → slight downward slope
+  const pressure = (metrics.maintenance.overdue * 2 + metrics.equipment.critical * 5) / Math.max(1, metrics.equipment.total);
+  const slope = Math.min(pressure * 0.5, 5); // max 5% degradation over 30 days
 
   return Array.from({ length: days }, (_, i) => ({
     date:  new Date(Date.now() - (days - i - 1) * 86_400_000).toISOString().split("T")[0],
-    value: Math.max(0, Math.min(100, baseHealth + (Math.random() - 0.5) * 10)),
+    value: Math.max(0, Math.min(100, baseHealth - slope + (slope / days) * i)),
   }));
 }
 

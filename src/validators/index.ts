@@ -82,9 +82,11 @@ export const createIncidentSchema = z.object({
 export const createComplianceSchema = z.object({
   regulation: z.string().min(1),
   category: z.enum(["FACTORY_ACT", "ISO", "PESO", "OISD", "ENVIRONMENTAL"]),
-  lastAuditDate: z.string().datetime().optional(),
-  nextAuditDate: z.string().datetime().optional(),
+  lastAuditDate: z.string().optional(),
+  nextAuditDate: z.string().optional(),
   riskLevel: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
+  status: z.enum(["COMPLIANT", "NON_COMPLIANT", "PENDING_REVIEW", "EXPIRING"]).optional(),
+  score: z.number().min(0).max(100).optional(),
 });
 
 // ── Booking / Leads ──────────────────────────────────────────────────────────

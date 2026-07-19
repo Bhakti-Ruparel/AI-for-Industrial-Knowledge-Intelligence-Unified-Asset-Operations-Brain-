@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { sendChatMessage } from "@/services/api/chat";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { sendChatMessage, fetchConversations, type ConversationSummary } from "@/services/api/chat";
 import { useToast } from "@/components/ui/toast";
 import { ConfidenceBadge } from "@/components/shared/confidence-badge";
 import { SourcePreviewPanel } from "@/components/copilot/source-preview-panel";
@@ -13,7 +13,7 @@ import {
   PanelRightOpen, Loader2, BookOpen, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ChatMessage, Source, Conversation } from "@/types";
+import type { ChatMessage, Source } from "@/types";
 
 // ── Agent type chips ──────────────────────────────────────────────────────────
 const AGENT_TYPES = [
@@ -33,13 +33,6 @@ const SUGGESTED_PROMPTS = [
   "Analyze compliance gaps for ISO 9001",
   "Recommend a VMC for 800×500×400mm workpiece",
   "What are the most recent incidents?",
-];
-
-// ── Static history (Phase 1 — real persistence via Prisma Conversation model in Phase 2) ──
-const MOCK_HISTORY: Conversation[] = [
-  { id: "1", title: "VMC Machine Selection",  lastMessage: "Based on your 800×500×400mm requirement…", timestamp: "2h ago", messageCount: 12 },
-  { id: "2", title: "Maintenance Schedule",   lastMessage: "SURFGRIND-600 is overdue…",               timestamp: "1d ago", messageCount: 8  },
-  { id: "3", title: "ISO Compliance Gaps",    lastMessage: "I found 3 critical areas…",               timestamp: "2d ago", messageCount: 15 },
 ];
 
 // ── Message bubble ────────────────────────────────────────────────────────────
@@ -164,12 +157,20 @@ export default function CopilotPage() {
   const [messages,       setMessages]       = useState<ChatMessage[]>([]);
   const [showSources,    setShowSources]    = useState(true);
   const [activeAgent,    setActiveAgent]    = useState<AgentType | null>(null);
-  const [activeChat,     setActiveChat]     = useState("1");
+  const [activeChat,     setActiveChat]     = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<Source | null>(null);
-  const [conversationId] = useState(() => `conv_${Date.now()}`);
+  const [conversationId, setConversationId] = useState(() => `conv_${Date.now()}`);
 
   const bottomRef  = useRef<HTMLDivElement>(null);
   const toast      = useToast();
+  const queryClient = useQueryClient();
+
+  // Load real conversation history
+  const { data: conversations = [] } = useQuery({
+    queryKey: ["conversations"],
+    queryFn:  fetchConversations,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -179,6 +180,10 @@ export default function CopilotPage() {
     mutationFn: (message: string) =>
       sendChatMessage(message, conversationId, activeAgent ?? undefined),
     onSuccess: (data) => {
+      // Update conversationId from server response (DB-assigned ID)
+      if (data.conversationId && data.conversationId !== conversationId) {
+        setConversationId(data.conversationId);
+      }
       const assistantMsg: ChatMessage = {
         id:        data.messageId,
         role:      "assistant",
@@ -193,11 +198,20 @@ export default function CopilotPage() {
         })),
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      // Refresh conversation history
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
     onError: (err: Error) => {
       toast.error("AI response failed", err.message || "The AI service is unavailable.");
     },
   });
+
+  const startNewConversation = () => {
+    setMessages([]);
+    setSelectedSource(null);
+    setConversationId(`conv_${Date.now()}`);
+    setActiveChat(null);
+  };
 
   const handleSend = (text?: string) => {
     const msg = (text ?? input).trim();
@@ -214,6 +228,16 @@ export default function CopilotPage() {
     chatMutation.mutate(msg);
   };
 
+  // Format relative time
+  function timeAgo(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60_000);
+    if (m < 60)  return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24)  return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
   const allSources = messages
     .filter((m) => m.sources?.length)
     .flatMap((m) => m.sources ?? []);
@@ -227,7 +251,7 @@ export default function CopilotPage() {
           <div className="flex items-center justify-between border-b border-zinc-100 p-4">
             <span className="text-[13px] font-semibold text-zinc-900">History</span>
             <button
-              onClick={() => { setMessages([]); setSelectedSource(null); }}
+              onClick={startNewConversation}
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors"
               title="New conversation"
             >
@@ -236,28 +260,38 @@ export default function CopilotPage() {
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
-              {MOCK_HISTORY.map((conv) => {
-                const isSelected = conv.id === activeChat;
-                return (
-                  <button
-                    key={conv.id}
-                    onClick={() => setActiveChat(conv.id)}
-                    className={cn(
-                      "w-full rounded-xl p-3 text-left transition-all border",
-                      isSelected ? "bg-[#FFF2EB] border-[#FFD6BE]" : "border-transparent hover:bg-zinc-50"
-                    )}
-                  >
-                    <p className={cn("text-[12px] font-semibold truncate", isSelected ? "text-[#FF6B2C]" : "text-zinc-800")}>
-                      {conv.title}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-zinc-400 truncate">{conv.lastMessage}</p>
-                    <div className="mt-1.5 flex items-center gap-1 text-zinc-400">
-                      <Clock className="h-3 w-3" />
-                      <span className="text-[10px]">{conv.timestamp}</span>
-                    </div>
-                  </button>
-                );
-              })}
+              {conversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-8 text-center px-3">
+                  <Bot className="h-6 w-6 text-zinc-200" />
+                  <p className="text-[11px] text-zinc-400">No conversations yet. Send a message to start.</p>
+                </div>
+              ) : (
+                conversations.map((conv: ConversationSummary) => {
+                  const isSelected = conv.id === activeChat;
+                  return (
+                    <button
+                      key={conv.id}
+                      onClick={() => setActiveChat(conv.id)}
+                      className={cn(
+                        "w-full rounded-xl p-3 text-left transition-all border",
+                        isSelected ? "bg-[#FFF2EB] border-[#FFD6BE]" : "border-transparent hover:bg-zinc-50"
+                      )}
+                    >
+                      <p className={cn("text-[12px] font-semibold truncate", isSelected ? "text-[#FF6B2C]" : "text-zinc-800")}>
+                        {conv.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-zinc-400 truncate">{conv.lastMessage}</p>
+                      <div className="mt-1.5 flex items-center gap-1 text-zinc-400">
+                        <Clock className="h-3 w-3" />
+                        <span className="text-[10px]">{timeAgo(conv.timestamp)}</span>
+                        {conv.messageCount > 0 && (
+                          <span className="ml-auto text-[9px] font-bold text-zinc-300">{conv.messageCount}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </ScrollArea>
         </div>

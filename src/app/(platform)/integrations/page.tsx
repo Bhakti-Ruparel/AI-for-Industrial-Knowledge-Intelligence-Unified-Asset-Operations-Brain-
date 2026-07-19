@@ -45,53 +45,7 @@ const INTEGRATIONS: Integration[] = [
     docsUrl:     "https://supabase.com/docs",
   },
   {
-<<<<<<< HEAD
-    name:        "Hugging Face",
-    description: "AI embeddings via sentence-transformers and LLM inference for RAG pipeline.",
-    icon:        Bot,
-    iconBg:      "bg-yellow-50",
-    iconColor:   "text-yellow-600",
-    status:      "connected",
-    envKey:      "HUGGINGFACE_API_KEY",
-    badge:       "AI",
-  },
-  {
-    name:        "Qdrant",
-    description: "Vector database for semantic document search and embedding storage.",
-    icon:        Cpu,
-    iconBg:      "bg-blue-50",
-    iconColor:   "text-blue-600",
-    status:      "disconnected",
-    envKey:      "QDRANT_URL",
-    docsUrl:     "https://qdrant.tech/documentation/",
-    badge:       "Vector DB",
-  },
-  {
-    name:        "Neo4j",
-    description: "Graph database for knowledge graph relationships, entity linking, and RCA analysis.",
-    icon:        Network,
-    iconBg:      "bg-purple-50",
-    iconColor:   "text-purple-600",
-    status:      "connected",
-    envKey:      "NEO4J_URI",
-    docsUrl:     "https://neo4j.com/docs/",
-    badge:       "Graph DB",
-  },
-  {
-    name:        "WhatsApp (Meta)",
-    description: "Send lead notifications and service request confirmations via WhatsApp Business API.",
-    icon:        MessageSquare,
-    iconBg:      "bg-green-50",
-    iconColor:   "text-green-600",
-    status:      "optional",
-    envKey:      "META_PHONE_NUMBER_ID",
-    docsUrl:     "https://developers.facebook.com/docs/whatsapp",
-    badge:       "Messaging",
-  },
-  {
-=======
     key:         "prisma",
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
     name:        "Prisma + pg",
     description: "ORM layer connecting to Supabase PostgreSQL via PgBouncer session pooler.",
     icon:        HardDrive,
@@ -200,6 +154,28 @@ export default function IntegrationsPage() {
     ? INTEGRATIONS.filter((i) => status[i.key]).length
     : 0;
 
+  // Pre-calculate summary counts to avoid heavy logic inside JSX mappings
+  const summaryStats = status ? [
+    {
+      label: "Connected",
+      value: connectedCount,
+      color: "text-emerald-600",
+      bg:    "bg-emerald-50/70 border-emerald-100",
+    },
+    {
+      label: "Not Set Up",
+      value: INTEGRATIONS.filter((i) => !status[i.key] && !i.optional).length,
+      color: "text-red-600",
+      bg:    "bg-red-50/70 border-red-100",
+    },
+    {
+      label: "Optional",
+      value: INTEGRATIONS.filter((i) => !status[i.key] && i.optional).length,
+      color: "text-amber-600",
+      bg:    "bg-amber-50/70 border-amber-100",
+    },
+  ] : [];
+
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
       <PageHeader
@@ -222,26 +198,7 @@ export default function IntegrationsPage() {
       {/* Summary strip */}
       {status && (
         <div className="grid grid-cols-3 gap-4">
-          {[
-            {
-              label: "Connected",
-              value: INTEGRATIONS.filter((i) => status[i.key]).length,
-              color: "text-emerald-600",
-              bg:    "bg-emerald-50/70 border-emerald-100",
-            },
-            {
-              label: "Not Set Up",
-              value: INTEGRATIONS.filter((i) => !status[i.key] && !i.optional).length,
-              color: "text-red-600",
-              bg:    "bg-red-50/70 border-red-100",
-            },
-            {
-              label: "Optional",
-              value: INTEGRATIONS.filter((i) => !status[i.key] && i.optional).length,
-              color: "text-amber-600",
-              bg:    "bg-amber-50/70 border-amber-100",
-            },
-          ].map((s) => (
+          {summaryStats.map((s) => (
             <div key={s.label} className={cn("rounded-2xl border p-4 text-center", s.bg)}>
               <p className={cn("text-2xl font-bold tabular-nums", s.color)}>{s.value}</p>
               <p className="text-[11px] text-zinc-500 mt-1 font-medium">{s.label}</p>
@@ -258,7 +215,7 @@ export default function IntegrationsPage() {
 
           return (
             <div
-              key={item.name}
+              key={item.key}
               className={cn(
                 "group rounded-2xl border bg-white p-5 transition-all duration-200",
                 "shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)]",

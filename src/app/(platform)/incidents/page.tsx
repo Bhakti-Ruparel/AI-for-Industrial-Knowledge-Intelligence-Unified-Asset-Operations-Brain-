@@ -28,17 +28,10 @@ const severityConfig: Record<string, { color: string; bg: string; border: string
 const statusConfig: Record<string, {
   icon: typeof AlertTriangle; bg: string; text: string; label: string;
 }> = {
-<<<<<<< HEAD
-  OPEN:          { icon: AlertTriangle, bg: "bg-red-50 text-red-700",       text: "text-red-700",     label: "Open"          },
-  INVESTIGATING: { icon: Clock,         bg: "bg-amber-50 text-amber-700",   text: "text-amber-700",   label: "Investigating" },
-  RESOLVED:      { icon: CheckCircle,   bg: "bg-emerald-50 text-emerald-700", text: "text-emerald-700", label: "Resolved"      },
-  CLOSED:        { icon: CheckCircle,   bg: "bg-zinc-100 text-zinc-600",    text: "text-zinc-600",    label: "Closed"        },
-=======
   OPEN:          { icon: AlertTriangle, bg: "bg-red-50 text-red-700",         text: "text-red-700",     label: "Open"          },
   INVESTIGATING: { icon: Clock,         bg: "bg-amber-50 text-amber-700",     text: "text-amber-700",   label: "Investigating" },
   RESOLVED:      { icon: CheckCircle,   bg: "bg-emerald-50 text-emerald-700", text: "text-emerald-700", label: "Resolved"      },
   CLOSED:        { icon: CheckCircle,   bg: "bg-zinc-100 text-zinc-600",      text: "text-zinc-600",    label: "Closed"        },
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
 };
 
 const TABS = [
@@ -57,37 +50,6 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-<<<<<<< HEAD
-// ── Offline Fallback Sample Data ──────────────────────────────────────────────
-const SAMPLE_INCIDENTS: IncidentRecord[] = [
-  {
-    id: "inc-1",
-    equipmentId: "eq-1",
-    equipmentName: "CVM-850 Vertical Machining Center",
-    title: "Spindle Overheating Cutoff",
-    description: "Thermal sensors triggered automatic emergency shutdown sequence. Core spindle temperature reached critical threshold of 98°C.",
-    status: "OPEN",
-    severity: "CRITICAL",
-    reportedAt: "2026-07-19T14:32:00.000Z",
-    rootCause: "Initial inspection suggests lubrication failure or foreign object debris binding within the primary housing track.",
-    evidence: [{ id: "ev1", title: "Thermal Log", type: "sensor_data" }],
-    timeline: [{ id: "t1", description: "System automated thermal cutoff trip initiated", user: "System Monitor", timestamp: "2026-07-19T14:32:00.000Z" }]
-  },
-  {
-    id: "inc-2",
-    equipmentId: "eq-3",
-    equipmentName: "ROBO-WELD Heavy Arm x4",
-    title: "Pneumatic Pressure Drop",
-    description: "Pressure drop detected in auxiliary manifold line B. Axis 3 operational speed restricted to 40% safe capacity mode.",
-    status: "INVESTIGATING",
-    severity: "HIGH",
-    reportedAt: "2026-07-19T09:15:00.000Z",
-    rootCause: "Technicians are pressure-testing lines to locate potential micro-fractures along the articulating hose assembly.",
-    evidence: [{ id: "ev2", title: "Pressure Chart", type: "document" }],
-    timeline: [{ id: "t2", description: "Assigned to field technician team Alpha", user: "Admin", timestamp: "2026-07-19T09:30:00.000Z" }]
-  }
-];
-=======
 // ── Report Incident Modal ─────────────────────────────────────────────────────
 interface ReportModalProps {
   open: boolean;
@@ -284,18 +246,12 @@ function ReportIncidentModal({ open, onClose, onSuccess }: ReportModalProps) {
     </div>
   );
 }
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
 
 // ── Incident row ──────────────────────────────────────────────────────────────
 function IncidentRow({ incident }: { incident: IncidentRecord }) {
   const [expanded, setExpanded] = useState(false);
-<<<<<<< HEAD
-  const severity  = severityConfig[incident.severity] ?? severityConfig["MEDIUM"];
-  const status    = statusConfig[incident.status]    ?? statusConfig["OPEN"];
-=======
   const severity   = severityConfig[incident.severity] ?? severityConfig["MEDIUM"];
   const status     = statusConfig[incident.status]     ?? statusConfig["OPEN"];
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
   const StatusIcon = status.icon;
   const evidence   = incident.evidence ?? [];
   const timeline   = incident.timeline ?? [];
@@ -366,7 +322,7 @@ function IncidentRow({ incident }: { incident: IncidentRecord }) {
             {evidence.length > 0 ? (
               evidence.slice(0, 2).map((ev) => (
                 <div key={ev.id} className="inline-flex items-center gap-1 text-[9px] font-bold text-zinc-500 bg-zinc-50 border border-zinc-100 rounded-lg px-1.5 py-0.5">
-                  {ev.type === "image"       && <FileImage   className="h-2.5 w-2.5 text-zinc-400" />}
+                  {ev.type === "image"      && <FileImage   className="h-2.5 w-2.5 text-zinc-400" />}
                   {ev.type === "document"    && <FileText    className="h-2.5 w-2.5 text-zinc-400" />}
                   {ev.type === "sensor_data" && <Database    className="h-2.5 w-2.5 text-zinc-400" />}
                   <span className="truncate max-w-[60px]">{ev.title}</span>
@@ -573,3 +529,58 @@ export default function IncidentsPage() {
     </div>
   );
 }
+
+// ── Fallback Dataset ──────────────────────────────────────────────────────────
+const SAMPLE_INCIDENTS: IncidentRecord[] = [
+  {
+    id: "inc-1",
+    title: "Spindle overheating error code E-104",
+    description: "Main drive axis assembly temperature crossed 95°C under continuous milling load cycles.",
+    equipmentId: "eq-01",
+    equipmentName: "CNC Milling Machine Alpha",
+    severity: "CRITICAL",
+    status: "OPEN",
+    reportedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(), // 25 mins ago
+    rootCause: "Coolant bypass valve failed to actuate due to physical debris buildup.",
+    evidence: [
+      { id: "ev-1", type: "sensor_data", title: "Thermal telemetry logs" },
+      { id: "ev-2", type: "image", title: "Scuffed bearing mount photo" }
+    ],
+    timeline: [
+      { id: "t-1", description: "Automated telemetry alert generated by edge node.", user: "System", timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString() },
+      { id: "t-2", description: "Machine safely isolated and shut down manually.", user: "R. Sharma (Operator)", timestamp: new Date(Date.now() - 1000 * 60 * 18).toISOString() }
+    ]
+  },
+  {
+    id: "inc-2",
+    title: "Servo controller connection drops",
+    description: "Intermittent packet drops detected across etherCAT ring network configuration.",
+    equipmentId: "eq-02",
+    equipmentName: "Robotic Arm Welder 4",
+    severity: "HIGH",
+    status: "INVESTIGATING",
+    reportedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(), // 3 hours ago
+    rootCause: undefined,
+    evidence: [
+      { id: "ev-3", type: "document", title: "Packet drop diagnostics dump" }
+    ],
+    timeline: [
+      { id: "t-3", description: "Network ping drop errors registered.", user: "System", timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString() }
+    ]
+  },
+  {
+    id: "inc-3",
+    title: "Assist gas pressure drop",
+    description: "Nitrogen output auxiliary tank tank pressures falling below acceptable levels.",
+    equipmentId: "eq-03",
+    equipmentName: "Laser Cutter Delta",
+    severity: "MEDIUM",
+    status: "RESOLVED",
+    reportedAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString(), // ~1d ago
+    rootCause: "Loose coupling thread seal on manifold sub-line assembly.",
+    evidence: [],
+    timeline: [
+      { id: "t-4", description: "Coupling tightened and pressure holds solid.", user: "A. Khan (Tech)", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 28).toISOString() }
+    ]
+  }
+];

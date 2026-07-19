@@ -401,7 +401,6 @@ function AddEquipmentModal({ open, onClose }: AddEquipmentModalProps) {
 export default function EquipmentPage() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const toast = useToast();
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["equipment"],
@@ -409,30 +408,9 @@ export default function EquipmentPage() {
     retry: 1,
   });
 
-<<<<<<< HEAD
-  // Safely extract layout data array depending on structural configuration returned by API
-  const apiData = (Array.isArray(data) ? data : (data as any)?.items ?? (data as any)?.data) as ApiEquipment[] | undefined;
-  
-  // Only treat as offline if there is a real system network error response
-  const isOffline = isError;
-
-  useEffect(() => {
-    if (isOffline && !isLoading) {
-      toast.error(
-        "Database connection failed", 
-        "Unable to reach server. Showing simulated offline model."
-      );
-    }
-  }, [isOffline, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // CRITICAL FIX: If database query is fine but returns an empty list, show mock cards instead of empty state
-  const equipment = isOffline || !apiData || apiData.length === 0 ? SAMPLE_EQUIPMENT : apiData;
-=======
-  // Use real data only — no hardcoded fallback
   const apiData = data?.data as unknown as ApiEquipment[] | undefined;
   const equipment = apiData ?? [];
   const isOffline = isError;
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
 
   const filtered = equipment.filter((e) =>
     e.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -481,11 +459,7 @@ export default function EquipmentPage() {
         }
       />
 
-<<<<<<< HEAD
-      {/* ── Offline Alert Banner ── */}
-=======
       {/* ── DB error banner ── */}
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
       {isOffline && !isLoading && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50/50 p-4 transition-all animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-3">

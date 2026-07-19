@@ -92,8 +92,7 @@ export default function InsightsPage() {
   const lastUpdated = timeAgo(new Date().toISOString());
 
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto">
-      {/* Header */}
+<div className="mx-auto w-full max-w-screen-2xl space-y-6 px-6 py-4">      {/* Header */}
       <PageHeader
         title="AI Insights"
         subtitle="Actionable recommendations derived from your live operational data."
@@ -133,8 +132,7 @@ export default function InsightsPage() {
 
       {/* Summary stats */}
       {!loadingMetrics && metrics && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
+<div className="grid grid-cols-2 gap-4 lg:grid-cols-4">          {[
             { label: "Equipment Health", value: `${metrics.equipment.averageHealth}%`,       icon: TrendingUp, color: metrics.equipment.averageHealth  >= 70 ? "text-emerald-600" : "text-red-500",   bg: metrics.equipment.averageHealth  >= 70 ? "bg-emerald-50" : "bg-red-50"   },
             { label: "Compliance Score", value: `${metrics.compliance.overallScore}%`,        icon: Shield,     color: metrics.compliance.overallScore   >= 70 ? "text-emerald-600" : "text-amber-600", bg: metrics.compliance.overallScore   >= 70 ? "bg-emerald-50" : "bg-amber-50" },
             { label: "Open Incidents",   value: String(metrics.incidents.open),               icon: AlertTriangle, color: metrics.incidents.open > 0 ? "text-red-500" : "text-emerald-600",            bg: metrics.incidents.open > 0 ? "bg-red-50" : "bg-emerald-50"               },
@@ -174,8 +172,7 @@ export default function InsightsPage() {
       )}
 
       {!isLoading && !isError && filtered.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((ins) => (
+<div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">          {filtered.map((ins) => (
             <ActionableInsightCard
               key={ins.id}
               icon={VARIANT_ICONS[ins.variant as InsightVariant] ?? Wrench}

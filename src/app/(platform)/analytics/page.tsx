@@ -118,8 +118,8 @@ export default function AnalyticsPage() {
 
   const { data: healthTrend   = [], isLoading: lHealth   } = useQuery({ queryKey: ["analytics-health-trend"],   queryFn: () => fetchHealthTrend(30),    enabled: !!metrics });
   const { data: incidentTrend = [], isLoading: lIncident } = useQuery({ queryKey: ["analytics-incident-trend"], queryFn: () => fetchIncidentTrend(30),  enabled: !!metrics });
-  const { data: docsByType    = [], isLoading: lDocs     } = useQuery({ queryKey: ["analytics-docs-type"],      queryFn: fetchDocsByType,               enabled: !!metrics });
-  const { data: maintCost     = [], isLoading: lCost     } = useQuery({ queryKey: ["analytics-maint-cost"],     queryFn: () => fetchMaintenanceCost(6), enabled: !!metrics });
+  const { data: docsByType    = [], isLoading: lDocs      } = useQuery({ queryKey: ["analytics-docs-type"],      queryFn: fetchDocsByType,               enabled: !!metrics });
+  const { data: maintCost     = [], isLoading: lCost      } = useQuery({ queryKey: ["analytics-maint-cost"],     queryFn: () => fetchMaintenanceCost(6), enabled: !!metrics });
 
   useEffect(() => {
     if (isError) {
@@ -157,7 +157,7 @@ export default function AnalyticsPage() {
       icon: Wrench,
     },
     { title: "Docs Processed",   value: metrics.documents.indexed.toLocaleString(),  change: metrics.documents.processing, positive: metrics.documents.processing === 0, changeLabel: metrics.documents.processing > 0 ? `${metrics.documents.processing} processing` : `of ${metrics.documents.total} total`, icon: FileText },
-    { title: "AI Queries Today", value: metrics.ai.queriesToday.toLocaleString(),    change: metrics.ai.queriesTotal,              positive: true,                              changeLabel: `${metrics.ai.queriesTotal.toLocaleString()} total`,                                                                            icon: Bot      },
+    { title: "AI Queries Today", value: metrics.ai.queriesToday.toLocaleString(),    change: metrics.ai.queriesTotal,              positive: true,                              changeLabel: `${metrics.ai.queriesTotal.toLocaleString()} total`,                                           icon: Bot      },
     { title: "Compliance Score", value: `${metrics.compliance.overallScore}%`,       change: metrics.compliance.nonCompliant,      positive: metrics.compliance.nonCompliant === 0, changeLabel: metrics.compliance.nonCompliant > 0 ? `${metrics.compliance.nonCompliant} violations` : `${metrics.compliance.compliant} compliant`, icon: Shield },
   ] : [];
 
@@ -367,9 +367,6 @@ export default function AnalyticsPage() {
 
         {/* ── Incidents ── */}
         <TabsContent value="incidents" className="space-y-5">
-<<<<<<< HEAD
-          <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the the past month" loading={lIncident} height={300}>
-=======
           <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the past month" loading={lIncident} height={300}>
             {incidentTrend.every((d) => d.value === 0) ? (
               <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
@@ -377,7 +374,6 @@ export default function AnalyticsPage() {
                 <p className="text-[12px] text-zinc-400">No incidents reported in the last 30 days.</p>
               </div>
             ) : (
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={incidentTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>

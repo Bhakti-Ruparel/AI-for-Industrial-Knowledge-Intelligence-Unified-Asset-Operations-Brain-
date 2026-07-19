@@ -1,16 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-<<<<<<< HEAD
-import { useQuery } from "@tanstack/react-query";
-import { fetchMaintenance, type MaintenanceRecord } from "@/services/api/maintenance";
-import { RowSkeleton, EmptyState } from "@/components/ui/page-skeleton";
-=======
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchMaintenance, createMaintenanceRecord, type MaintenanceRecord } from "@/services/api/maintenance";
 import { fetchEquipment } from "@/services/api/equipment";
 import { RowSkeleton, ErrorState, EmptyState } from "@/components/ui/page-skeleton";
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
 import { useToast } from "@/components/ui/toast";
@@ -46,56 +40,6 @@ type ListTab = (typeof LIST_TABS)[number];
 
 type ViewMode = "list" | "kanban";
 
-<<<<<<< HEAD
-// ── Offline Fallback Sample Data ──────────────────────────────────────────────
-const SAMPLE_MAINTENANCE: MaintenanceRecord[] = [
-  {
-    id: "maint-1",
-    equipmentId: "eq-1",
-    equipmentName: "CVM-850 Vertical Machining Center",
-    title: "Spindle Bearing Calibration",
-    description: "Perform alignment and vibration testing on main spindle assemble line axis due to microscopic drift.",
-    status: "IN_PROGRESS",
-    priority: "HIGH",
-    type: "PREVENTIVE",
-    scheduledDate: "2026-07-22T08:00:00.000Z",
-    checklist: [
-      { id: "c1", title: "Isolate power supply", completed: true },
-      { id: "c2", title: "Measure runtime vibration metrics", completed: true },
-      { id: "c3", title: "Apply physical spacer recalibrations", completed: false }
-    ],
-    aiRecommendation: "Vibration frequency patterns hint at an 84% failure window probability within 45 operating hours if bearing tolerances remain loose."
-  },
-  {
-    id: "maint-2",
-    equipmentId: "eq-2",
-    equipmentName: "DYNAMILL-1200 High Speed Miller",
-    title: "Emergency Hydraulic Seal Swap",
-    description: "Fluid drop pressure noted in central containment chamber. Swapping primary O-ring layout.",
-    status: "OVERDUE",
-    priority: "CRITICAL",
-    type: "CORRECTIVE",
-    scheduledDate: "2026-07-15T06:00:00.000Z",
-    checklist: [
-      { id: "c4", title: "Drain secondary system reservoir", completed: false }
-    ],
-    aiRecommendation: "Critical system risk. Overdue cycle reduces coolant efficiency by roughly 32% under steady multi-shift assembly operations."
-  },
-  {
-    id: "maint-3",
-    equipmentId: "eq-1",
-    equipmentName: "CVM-850 Vertical Machining Center",
-    title: "Routine Workspace Fluid Flush",
-    description: "Standard clean cycle execution for base pump infrastructure components.",
-    status: "SCHEDULED",
-    priority: "LOW",
-    type: "ROUTINE",
-    scheduledDate: "2026-07-29T10:00:00.000Z",
-    checklist: [],
-    aiRecommendation: "" // Fixed strict type requirement if field isn't explicitly optional
-  }
-];
-=======
 // ── Add Maintenance Task Modal ────────────────────────────────────────────────
 interface AddTaskModalProps {
   open: boolean;
@@ -337,7 +281,6 @@ function AddTaskModal({ open, onClose }: AddTaskModalProps) {
     </div>
   );
 }
->>>>>>> 2db3a995329492c2f715da3bee0cbf955448467a
 
 // ── Task card (list view) ─────────────────────────────────────────────────────
 function TaskRow({ task }: { task: MaintenanceRecord }) {
@@ -739,3 +682,53 @@ export default function MaintenancePage() {
     </div>
   );
 }
+
+// ── Fallback Dataset ──────────────────────────────────────────────────────────
+const SAMPLE_MAINTENANCE: MaintenanceRecord[] = [
+  {
+    id: "m1",
+    equipmentId: "eq-01",
+    equipmentName: "CNC Milling Machine Alpha",
+    title: "Hydraulic Fluid Replacement",
+    description: "Flushing out older low-viscosity fluid lines and installing clean synthetic fluid seals.",
+    type: "PREVENTIVE",
+    priority: "CRITICAL",
+    status: "OVERDUE",
+    scheduledDate: new Date(Date.now() - 86400000 * 4).toISOString(),
+    checklist: [
+      { id: "c1", task: "Drain old hydraulic reserve pump tank", completed: true },
+      { id: "c2", task: "Replace internal pleated particulate microfilter", completed: false },
+      { id: "c3", task: "Refill reservoir with approved grade fluid", completed: false }
+    ],
+    aiRecommendation: "Anomalous temperature peaks detected on main spindle motor. Replacing fluid right now prevents total thermal damage."
+  },
+  {
+    id: "m2",
+    equipmentId: "eq-02",
+    equipmentName: "Robotic Arm Welder 4",
+    title: "Joint Calibrations & Tuning",
+    description: "Recalibrating high-precision servo encoder offsets to optimize pathway geometric accuracies.",
+    type: "PREDICTIVE",
+    priority: "HIGH",
+    status: "IN_PROGRESS",
+    scheduledDate: new Date().toISOString(),
+    checklist: [
+      { id: "c4", task: "Lockout tagout robotic dynamic axis frame", completed: true },
+      { id: "c5", task: "Verify home coordinates alignment indices", completed: false }
+    ],
+    aiRecommendation: "Axis 3 tracking variation errors increased by 7% over recent workshifts. Immediate physical calibration advised."
+  },
+  {
+    id: "m3",
+    equipmentId: "eq-03",
+    equipmentName: "Laser Cutter Delta",
+    title: "Optics Assembly Cleaning",
+    description: "Inspecting and cleaning focusing mirrors and high-power lenses with specialized solvents.",
+    type: "PREVENTIVE",
+    priority: "MEDIUM",
+    status: "SCHEDULED",
+    scheduledDate: new Date(Date.now() + 86400000 * 2).toISOString(),
+    checklist: [],
+    aiRecommendation: undefined
+  }
+];

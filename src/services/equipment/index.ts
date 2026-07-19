@@ -17,7 +17,29 @@ export async function getEquipmentById(id: string, organizationId: string) {
 }
 
 export async function createEquipment(data: any, organizationId: string) {
-  return equipmentRepository.create({ ...data, organizationId });
+  // Resolve categoryId — if it's a slug (not a CUID), find-or-create the category
+  let categoryId = data.categoryId;
+  if (prisma && categoryId && !categoryId.startsWith("c")) {
+    // Likely a slug like "vmc", "grinding", etc.
+    const slug = categoryId.toLowerCase().replace(/\s+/g, "-");
+    let category = await (prisma as any).equipmentCategory.findUnique({
+      where: { slug },
+    });
+    if (!category) {
+      // Auto-create the category
+      const nameMap: Record<string, string> = {
+        vmc: "VMC", vtl: "VTL", grinding: "Grinding",
+        "5axis": "5 Axis VMC", "5-axis-vmc": "5 Axis VMC",
+        turnmill: "Turnmill", other: "Other",
+      };
+      category = await (prisma as any).equipmentCategory.create({
+        data: { name: nameMap[slug] ?? slug.toUpperCase(), slug },
+      });
+    }
+    categoryId = category.id;
+  }
+
+  return equipmentRepository.create({ ...data, categoryId, organizationId });
 }
 
 export async function updateEquipment(id: string, organizationId: string, data: any) {

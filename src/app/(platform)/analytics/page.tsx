@@ -218,6 +218,12 @@ export default function AnalyticsPage() {
         <TabsContent value="equipment" className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
             <ChartCard title="Equipment Health Trend (30 days)" subtitle="Average health score across all machines" loading={lHealth} height={240}>
+              {healthTrend.length === 0 || healthTrend.every((d) => d.value === 0) ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <TrendingUp className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">Add equipment to see health trends.</p>
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={healthTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <defs>
@@ -233,10 +239,16 @@ export default function AnalyticsPage() {
                   <Area type="monotone" dataKey="value" stroke="#FF6B2C" strokeWidth={2} fill="url(#hGrad)" dot={false} activeDot={{ r: 4, fill: "#FF6B2C" }} />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </ChartCard>
 
             <ChartCard title="Status Distribution" loading={isLoading} height={240}>
-              {metrics && (
+              {metrics && metrics.equipment.total === 0 ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <Wrench className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">No equipment registered yet.</p>
+                </div>
+              ) : metrics && (
                 <div className="flex items-center justify-center gap-10 h-full">
                   {[
                     { label: "Operational",  value: metrics.equipment.operational, color: "#22C55E" },
@@ -260,6 +272,12 @@ export default function AnalyticsPage() {
         <TabsContent value="documents" className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
             <ChartCard title="Documents by Type" loading={lDocs} height={260}>
+              {docsByType.length === 0 ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <FileText className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">Upload documents to see type breakdown.</p>
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={docsByType} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
@@ -271,10 +289,16 @@ export default function AnalyticsPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </ChartCard>
 
             <ChartCard title="Index Status" loading={isLoading} height={260}>
-              {metrics && (
+              {metrics && metrics.documents.total === 0 ? (
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <FileText className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">No documents uploaded yet.</p>
+                </div>
+              ) : metrics && (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -303,6 +327,12 @@ export default function AnalyticsPage() {
         {/* ── Maintenance ── */}
         <TabsContent value="maintenance" className="space-y-5">
           <ChartCard title="Maintenance Cost by Type (6 months)" subtitle="Breakdown of preventive, corrective, and predictive costs" loading={lCost} height={300}>
+            {maintCost.every((d) => d.preventive === 0 && d.corrective === 0 && d.predictive === 0) ? (
+              <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                <Wrench className="h-8 w-8 text-zinc-200" />
+                <p className="text-[12px] text-zinc-400">No maintenance cost data yet. Complete maintenance tasks with cost entries to populate this chart.</p>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={maintCost} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
@@ -315,12 +345,19 @@ export default function AnalyticsPage() {
                 <Bar dataKey="predictive" name="Predictive"  stackId="a" fill="#3B82F6" radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            )}
           </ChartCard>
         </TabsContent>
 
         {/* ── Incidents ── */}
         <TabsContent value="incidents" className="space-y-5">
           <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the past month" loading={lIncident} height={300}>
+            {incidentTrend.every((d) => d.value === 0) ? (
+              <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                <TrendingDown className="h-8 w-8 text-zinc-200" />
+                <p className="text-[12px] text-zinc-400">No incidents reported in the last 30 days.</p>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={incidentTrend} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
@@ -336,6 +373,7 @@ export default function AnalyticsPage() {
                 <Line type="monotone" dataKey="value" name="Incidents" stroke="#EF4444" strokeWidth={2.5} dot={{ r: 3, fill: "#EF4444" }} activeDot={{ r: 5 }} animationDuration={1200} />
               </LineChart>
             </ResponsiveContainer>
+            )}
           </ChartCard>
         </TabsContent>
 
@@ -355,9 +393,9 @@ export default function AnalyticsPage() {
                 </ResponsiveContainer>
               )}
               {metrics && complianceData.length === 0 && (
-                <div className="flex h-full items-center justify-center flex-col gap-2">
-                  <p className="text-2xl font-bold text-emerald-600">All Clear</p>
-                  <p className="text-sm text-zinc-400">No compliance issues detected</p>
+                <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
+                  <Shield className="h-8 w-8 text-zinc-200" />
+                  <p className="text-[12px] text-zinc-400">Add compliance records to see status breakdown.</p>
                 </div>
               )}
             </ChartCard>

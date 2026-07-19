@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchEquipment } from "@/services/api/equipment";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchEquipment, createEquipment } from "@/services/api/equipment";
 import { CardGridSkeleton, EmptyState } from "@/components/ui/page-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
 import { FilterBar } from "@/components/shared/filter-bar";
+import { useToast } from "@/components/ui/toast";
 import {
   Wrench, FileText, Calendar, SlidersHorizontal,
-  MapPin, Tag, TrendingUp, TrendingDown, Activity, AlertCircle, RefreshCw
+  MapPin, Tag, TrendingUp, TrendingDown, Activity, AlertCircle, RefreshCw, Plus, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -165,9 +166,242 @@ function EquipmentCard({ eq }: { eq: ApiEquipment }) {
   );
 }
 
+// ── Add Equipment Modal ────────────────────────────────────────────────────────
+interface AddEquipmentModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+function AddEquipmentModal({ open, onClose }: AddEquipmentModalProps) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+
+  const [form, setForm] = useState({
+    name:         "",
+    model:        "",
+    series:       "",
+    categoryId:   "",
+    serialNumber: "",
+    location:     "",
+    floor:        "",
+    bay:          "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const mutation = useMutation({
+    mutationFn: () => createEquipment(form as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      toast.success("Equipment added successfully");
+      setForm({ name: "", model: "", series: "", categoryId: "", serialNumber: "", location: "", floor: "", bay: "" });
+      setErrors({});
+      onClose();
+    },
+    onError: () => {
+      toast.error("Failed to add equipment. Please try again.");
+    },
+  });
+
+  function validate() {
+    const e: Record<string, string> = {};
+    if (!form.name.trim())  e.name  = "Name is required";
+    if (!form.model.trim()) e.model = "Model is required";
+    if (!form.series.trim()) e.series = "Series is required";
+    if (!form.categoryId)   e.categoryId = "Category is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  function handleSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!validate()) return;
+    mutation.mutate();
+  }
+
+  if (!open) return null;
+
+  const categories = [
+    { value: "vmc",       label: "VMC"          },
+    { value: "vtl",       label: "VTL"          },
+    { value: "grinding",  label: "Grinding"     },
+    { value: "5axis",     label: "5 Axis VMC"   },
+    { value: "turnmill",  label: "Turnmill"     },
+    { value: "other",     label: "Other"        },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[16px] font-bold text-zinc-900">Add Equipment</h2>
+            <p className="text-[12px] text-zinc-400 mt-0.5">Register a new machine or equipment in the system.</p>
+          </div>
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-all">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Equipment Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. CVM-850 #3"
+              className={cn(
+                "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300",
+                "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                errors.name ? "border-red-400" : "border-zinc-200"
+              )}
+            />
+            {errors.name && <p className="text-[11px] text-red-500 mt-1">{errors.name}</p>}
+          </div>
+
+          {/* Model + Series */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                Model <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.model}
+                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                placeholder="e.g. Vertical Machining Center"
+                className={cn(
+                  "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300",
+                  "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                  errors.model ? "border-red-400" : "border-zinc-200"
+                )}
+              />
+              {errors.model && <p className="text-[11px] text-red-500 mt-1">{errors.model}</p>}
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                Series <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.series}
+                onChange={(e) => setForm((f) => ({ ...f, series: e.target.value }))}
+                placeholder="e.g. CVM Series"
+                className={cn(
+                  "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300",
+                  "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                  errors.series ? "border-red-400" : "border-zinc-200"
+                )}
+              />
+              {errors.series && <p className="text-[11px] text-red-500 mt-1">{errors.series}</p>}
+            </div>
+          </div>
+
+          {/* Category + Serial Number */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                Category <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={form.categoryId}
+                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                className={cn(
+                  "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 bg-white",
+                  "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
+                  errors.categoryId ? "border-red-400" : "border-zinc-200"
+                )}
+              >
+                <option value="">Select…</option>
+                {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+              {errors.categoryId && <p className="text-[11px] text-red-500 mt-1">{errors.categoryId}</p>}
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                Serial Number
+              </label>
+              <input
+                type="text"
+                value={form.serialNumber}
+                onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))}
+                placeholder="Optional"
+                className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Location + Floor + Bay */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                placeholder="e.g. Bay 1"
+                className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Floor</label>
+              <input
+                type="text"
+                value={form.floor}
+                onChange={(e) => setForm((f) => ({ ...f, floor: e.target.value }))}
+                placeholder="e.g. Ground"
+                className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Bay</label>
+              <input
+                type="text"
+                value={form.bay}
+                onChange={(e) => setForm((f) => ({ ...f, bay: e.target.value }))}
+                placeholder="e.g. B3"
+                className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-zinc-200 px-4 py-2.5 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-50 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="flex-1 rounded-xl bg-[#FF6B2C] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#FF824E] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {mutation.isPending ? (
+                <span className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              ) : (
+                <Wrench className="h-3.5 w-3.5" />
+              )}
+              {mutation.isPending ? "Adding…" : "Add Equipment"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function EquipmentPage() {
   const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const toast = useToast();
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["equipment"],
@@ -204,17 +438,26 @@ export default function EquipmentPage() {
         title="Equipment"
         subtitle="Monitor health scores, maintenance schedules, and documentation for all plant equipment."
         action={
-          statusSummary.length > 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              {statusSummary.map((s) => (
-                <div key={s.key} className="flex items-center gap-1.5 border-r last:border-0 border-zinc-200 pr-3 last:pr-0">
-                  <div className={cn("h-2 w-2 rounded-full", s.color)} />
-                  <span className="text-[11px] font-bold text-zinc-700">{counts[s.key]}</span>
-                  <span className="text-[11px] text-zinc-400 hidden sm:inline">{s.label}</span>
-                </div>
-              ))}
-            </div>
-          ) : undefined
+          <div className="flex items-center gap-3">
+            {statusSummary.length > 0 && (
+              <div className="hidden sm:flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                {statusSummary.map((s) => (
+                  <div key={s.key} className="flex items-center gap-1.5 border-r last:border-0 border-zinc-200 pr-3 last:pr-0">
+                    <div className={cn("h-2 w-2 rounded-full", s.color)} />
+                    <span className="text-[11px] font-bold text-zinc-700">{counts[s.key]}</span>
+                    <span className="text-[11px] text-zinc-400 hidden lg:inline">{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setShowModal(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#FF6B2C] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#FF824E] transition-all shadow-[0_2px_8px_rgba(255,107,44,0.3)] active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" />
+              Add Equipment
+            </button>
+          </div>
         }
       />
 
@@ -268,6 +511,9 @@ export default function EquipmentPage() {
           {filtered.map((eq) => <EquipmentCard key={eq.id} eq={eq} />)}
         </div>
       )}
+
+      {/* Add equipment modal */}
+      <AddEquipmentModal open={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
 }

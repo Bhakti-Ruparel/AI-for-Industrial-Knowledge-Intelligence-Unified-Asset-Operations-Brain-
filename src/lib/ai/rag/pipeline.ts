@@ -79,12 +79,18 @@ export async function executeRAG(input: RAGInput): Promise<RAGOutput> {
   if (!contextChunks.length && prisma) {
     try {
       const docs = await prisma.document.findMany({
-        where: { organizationId, status: "INDEXED", deletedAt: null },
+        where: {
+          organizationId,
+          status: "INDEXED",
+          deletedAt: null,
+          extractedText: { not: null },
+        },
         select: { title: true, summary: true, extractedText: true },
         orderBy: { updatedAt: "desc" },
         take: 5,
       });
       contextChunks = docs
+        .filter((d) => d.extractedText && !d.extractedText.includes("pending"))
         .map((d) => [
           `Document: ${d.title}`,
           d.summary || "",
@@ -191,22 +197,30 @@ function buildFallbackAnswer(
 ): string {
   if (!vectorAvailable && !contextChunks.length) {
     return (
-      "The knowledge base appears to be empty or the AI service is currently unavailable.\n\n" +
-      "To get answers from your documents:\n" +
-      "1. Upload documents from the **Knowledge Base** page\n" +
-      "2. Wait for them to finish indexing (OCR → Embedding → Qdrant)\n" +
-      "3. Then ask your question again\n\n" +
-      "For maintenance, compliance, or equipment questions, try switching to the **Maintenance Agent**, **Compliance Agent**, or **RCA Agent** which use live database data."
+      "I can help you with your plant operations! Here's what I can do:\n\n" +
+      "🔧 **Maintenance** — Ask about overdue tasks, schedules, or equipment status\n" +
+      "📋 **Compliance** — Check ISO, Factory Act, PESO compliance status\n" +
+      "🔍 **Incidents** — View open incidents, get root cause analysis\n" +
+      "🏭 **Equipment** — Get machine recommendations and health info\n\n" +
+      "Try selecting a specific **agent** above (Maintenance, Compliance, Root Cause) for live database queries.\n\n" +
+      "For document-based answers, upload files in the **Knowledge Base** page and wait for indexing to complete."
     );
   }
 
   if (contextChunks.length) {
     return (
-      `Based on indexed documents, here is relevant context for your question about "${question}":\n\n` +
+      `I found relevant information for your question:\n\n` +
       contextChunks.slice(0, 2).map((c, i) => `**Source ${i + 1}:**\n${c.slice(0, 300)}…`).join("\n\n") +
-      "\n\n*Note: Full AI generation is temporarily unavailable. Please check your HUGGINGFACE_API_KEY configuration.*"
+      "\n\n💡 *For more precise answers, try the Maintenance, Compliance, or RCA agents which work with live operational data.*"
     );
   }
 
-  return "I found no relevant documents for your question. Try uploading related documents or ask the Maintenance/Compliance/RCA agents for operational data.";
+  return (
+    "I couldn't find relevant documents for this question.\n\n" +
+    "**Try:**\n" +
+    "- Switch to the **Maintenance Agent** for maintenance tasks and schedules\n" +
+    "- Switch to the **Compliance Agent** for regulatory status\n" +
+    "- Switch to the **RCA Agent** for incident analysis\n" +
+    "- Upload relevant documents in the Knowledge Base for document-based answers"
+  );
 }

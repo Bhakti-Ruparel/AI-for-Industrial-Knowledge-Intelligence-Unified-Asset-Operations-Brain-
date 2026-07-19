@@ -7,7 +7,6 @@ import { useToast } from "@/components/ui/toast";
 import { ConfidenceBadge } from "@/components/shared/confidence-badge";
 import { SourcePreviewPanel } from "@/components/copilot/source-preview-panel";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Send, Sparkles, FileText, Bot, Clock, Plus,
   PanelRightOpen, Loader2, BookOpen, ChevronDown, ChevronUp,
@@ -162,6 +161,7 @@ export default function CopilotPage() {
   const [conversationId, setConversationId] = useState(() => `conv_${Date.now()}`);
 
   const bottomRef  = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toast      = useToast();
   const queryClient = useQueryClient();
 
@@ -171,10 +171,6 @@ export default function CopilotPage() {
     queryFn:  fetchConversations,
     staleTime: 30_000,
   });
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const chatMutation = useMutation({
     mutationFn: (message: string) =>
@@ -205,6 +201,13 @@ export default function CopilotPage() {
       toast.error("AI response failed", err.message || "The AI service is unavailable.");
     },
   });
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [messages, chatMutation.isPending]);
 
   const startNewConversation = () => {
     setMessages([]);
@@ -244,7 +247,7 @@ export default function CopilotPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)]">
-      <div className="flex flex-1 gap-5 min-h-0">
+      <div className="flex flex-1 gap-5 min-h-0 overflow-hidden">
 
         {/* ── History Sidebar ──────────────────────────────────────────────── */}
         <div className="w-60 shrink-0 rounded-2xl border border-zinc-200 bg-white flex flex-col shadow-xs overflow-hidden">
@@ -258,7 +261,7 @@ export default function CopilotPage() {
               <Plus className="h-3.5 w-3.5 text-zinc-600" />
             </button>
           </div>
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto">
             <div className="p-2 space-y-1">
               {conversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-8 text-center px-3">
@@ -293,13 +296,13 @@ export default function CopilotPage() {
                 })
               )}
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         {/* ── Main Chat ────────────────────────────────────────────────────── */}
         <div className="flex flex-1 flex-col rounded-2xl border border-zinc-200 bg-white shadow-xs overflow-hidden min-w-0">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3.5">
+          <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3.5 shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 rounded-xl bg-[#FFF2EB]">
                 <Sparkles className="h-4 w-4 text-[#FF6B2C]" />
@@ -322,7 +325,7 @@ export default function CopilotPage() {
           </div>
 
           {/* Agent selector */}
-          <div className="border-b border-zinc-50 px-5 py-2.5 flex items-center gap-2 overflow-x-auto">
+          <div className="border-b border-zinc-50 px-5 py-2.5 flex items-center gap-2 overflow-x-auto shrink-0">
             <span className="text-[11px] text-zinc-400 font-medium shrink-0">Agent:</span>
             {AGENT_TYPES.map((agent) => (
               <button
@@ -340,8 +343,8 @@ export default function CopilotPage() {
             ))}
           </div>
 
-          {/* Messages */}
-          <ScrollArea className="flex-1 px-5 py-5">
+          {/* Messages — scrollable area */}
+          <div className="flex-1 overflow-y-auto px-5 py-5" ref={scrollContainerRef}>
             <div className="space-y-5 max-w-3xl mx-auto">
               {messages.length === 0 && !chatMutation.isPending && (
                 <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
@@ -369,7 +372,7 @@ export default function CopilotPage() {
               {chatMutation.isPending && <ThinkingBubble />}
               <div ref={bottomRef} />
             </div>
-          </ScrollArea>
+          </div>
 
           {/* Source preview panel */}
           {selectedSource && (
@@ -380,7 +383,7 @@ export default function CopilotPage() {
           )}
 
           {/* Input */}
-          <div className="border-t border-zinc-100 bg-zinc-50/50 p-4 space-y-2.5">
+          <div className="border-t border-zinc-100 bg-zinc-50/50 p-4 space-y-2.5 shrink-0">
             {messages.length === 0 && (
               <div className="flex flex-wrap gap-1.5 max-w-3xl mx-auto">
                 {SUGGESTED_PROMPTS.map((prompt) => (
@@ -421,10 +424,10 @@ export default function CopilotPage() {
         {/* ── Sources Panel ────────────────────────────────────────────────── */}
         {showSources && (
           <div className="w-72 shrink-0 rounded-2xl border border-zinc-200 bg-white flex flex-col shadow-xs overflow-hidden">
-            <div className="border-b border-zinc-100 px-4 py-3.5">
+            <div className="border-b border-zinc-100 px-4 py-3.5 shrink-0">
               <p className="text-[13px] font-semibold text-zinc-900">Sources</p>
             </div>
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
               <div className="p-3 space-y-2.5">
                 {allSources.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
@@ -465,7 +468,7 @@ export default function CopilotPage() {
                   })
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         )}
       </div>

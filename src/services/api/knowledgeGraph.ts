@@ -2,6 +2,8 @@
 // Knowledge Graph API Service — Client-side fetch wrappers
 // ═══════════════════════════════════════════════════════════════════════════════
 
+import { authFetch } from "./auth";
+
 const API = "/api";
 
 export interface KGNode {
@@ -14,7 +16,7 @@ export interface KGNode {
 
 export async function fetchGraphNodes(query = ""): Promise<KGNode[]> {
   const params = query ? `?query=${encodeURIComponent(query)}` : "?query=equipment";
-  const res = await fetch(`${API}/knowledge-graph${params}`);
+  const res = await authFetch(`${API}/knowledge-graph${params}`);
   if (!res.ok) throw new Error(`Failed to fetch knowledge graph: ${res.status}`);
   const json = await res.json();
   return json.data ?? [];
@@ -25,7 +27,7 @@ export async function createGraphNode(data: {
   label: string;
   properties?: Record<string, unknown>;
 }): Promise<KGNode> {
-  const res = await fetch(`${API}/knowledge-graph`, {
+  const res = await authFetch(`${API}/knowledge-graph`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),

@@ -5,9 +5,9 @@ const nextConfig: NextConfig = {
   // Only externalize packages that truly cannot be bundled
   serverExternalPackages: ["exceljs", "@prisma/client", "prisma"],
 
-  // Fix Turbopack picking wrong workspace root when multiple lockfiles exist (local dev only)
+  // Fix Turbopack picking wrong workspace root
   turbopack: {
-    root: ".",
+    root: process.cwd(),
   },
 
   // Vercel deployment: allow images from Supabase storage

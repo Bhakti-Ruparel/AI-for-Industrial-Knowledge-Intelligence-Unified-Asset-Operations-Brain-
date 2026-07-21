@@ -159,7 +159,7 @@ export async function uploadDocument(input: UploadDocumentInput) {
       logger.info({ documentId: effectiveDocId, status: result.status, textLength: result.textLength, chunks: result.chunksCreated, errors: result.errors }, "[PIPELINE] Complete");
     }).catch((err) => {
       logger.error({ documentId: effectiveDocId, error: err.message, stack: err.stack?.slice(0, 500) }, "[PIPELINE] CRASHED");
-      documentRepository.markFailed(effectiveDocId, "PIPELINE_CRASH", err.message).catch(() => {});
+      // Don't mark as failed — keep document accessible
     });
 
     // If running on Vercel, try to use waitUntil to extend execution

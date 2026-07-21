@@ -123,10 +123,12 @@ export async function processDocument(input: PipelineInput): Promise<PipelineRes
       .catch(() => {});
   }
 
-  // Skip remaining stages if no text
+  // Skip remaining stages if no text — but DON'T mark as ERROR
   if (extractedText.length < 50) {
-    await setStage(documentId, "FAILED", { status: "ERROR" });
-    return { documentId, textLength, chunksCreated, embeddingsStored, nodesCreated, edgesCreated, ocrConfidence, status: "failed", errors: [...errors, "Insufficient text extracted"] };
+    // Keep status as UPLOADED so the document remains visible and can be retried
+    await setStage(documentId, "OCR_INCOMPLETE", { ocrStatus: "FAILED" });
+    logger.warn({ documentId, textLength: extractedText.length, errors }, "[PIPELINE] Insufficient text — skipping further stages but keeping document");
+    return { documentId, textLength, chunksCreated, embeddingsStored, nodesCreated, edgesCreated, ocrConfidence, status: "partial", errors: [...errors, "Text extraction incomplete — document still accessible"] };
   }
 
   // ── Stage 2: DOCUMENT_CLASSIFICATION ─────────────────────────────────────

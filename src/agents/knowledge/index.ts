@@ -4,7 +4,6 @@
 
 import type { AgentDefinition, AgentInput, AgentOutput } from "@/lib/ai/orchestrator";
 import { synthesize } from "@/lib/ai/llm-synthesizer";
-import { extractText } from "@/lib/ai/ocr";
 import { getSupabaseServer } from "@/lib/database/supabase/client";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/utils/logger";
@@ -112,6 +111,7 @@ async function gatherContext(query: string, organizationId: string) {
       // Option 3: Live extract from storage (on-demand)
       if (!textContent && matchedDocs[0]?.storagePath && matchedDocs[0]?.mimeType === "application/pdf") {
         try {
+          const { extractText } = await import("@/lib/ai/ocr");
           const supabase = getSupabaseServer();
           const doc = matchedDocs[0];
           logger.info({ docId: doc.id, path: doc.storagePath, bucket: doc.bucketName }, "Downloading PDF for live extraction");

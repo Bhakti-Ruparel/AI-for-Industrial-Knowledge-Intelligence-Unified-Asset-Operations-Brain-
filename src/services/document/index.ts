@@ -140,31 +140,32 @@ export async function uploadDocument(input: UploadDocumentInput) {
     { organizationId, userId: uploadedById }
   ).catch(() => {});
 
-  // 5. Trigger pipeline — run inline to guarantee execution
+  // 5. Trigger pipeline — fire and don't await (background processing)
+  // On Vercel: the pipeline runs within the same request lifecycle but doesn't block the response.
+  // Use waitUntil pattern: start the promise, don't await it for the response.
   const effectiveDocId = document.id ?? documentId;
   if (effectiveDocId !== "unconfigured") {
-    logger.info({ documentId: effectiveDocId }, "[PIPELINE] Starting document processing...");
-    try {
-      const { processDocument } = await import("./pipeline");
-      const result = await processDocument({
+    logger.info({ documentId: effectiveDocId }, "[PIPELINE] Triggering document processing");
+    const pipelinePromise = import("./pipeline").then(({ processDocument }) =>
+      processDocument({
         documentId:     effectiveDocId,
         buffer:         file,
         mimeType,
         title,
         organizationId,
         equipmentId,
-      });
-      logger.info({
-        documentId: effectiveDocId,
-        status: result.status,
-        textLength: result.textLength,
-        chunks: result.chunksCreated,
-        embeddings: result.embeddingsStored,
-        errors: result.errors,
-      }, "[PIPELINE] Document processing complete");
-    } catch (err: any) {
-      logger.error({ documentId: effectiveDocId, error: err.message, stack: err.stack?.slice(0, 500) }, "[PIPELINE] Pipeline crashed");
+      })
+    ).then((result) => {
+      logger.info({ documentId: effectiveDocId, status: result.status, textLength: result.textLength, chunks: result.chunksCreated, errors: result.errors }, "[PIPELINE] Complete");
+    }).catch((err) => {
+      logger.error({ documentId: effectiveDocId, error: err.message, stack: err.stack?.slice(0, 500) }, "[PIPELINE] CRASHED");
       documentRepository.markFailed(effectiveDocId, "PIPELINE_CRASH", err.message).catch(() => {});
+    });
+
+    // If running on Vercel, try to use waitUntil to extend execution
+    // Otherwise the promise runs as a detached microtask
+    if (typeof globalThis !== "undefined" && (globalThis as any).__nextWaitUntil) {
+      (globalThis as any).__nextWaitUntil(pipelinePromise);
     }
   }
 

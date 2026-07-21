@@ -14,7 +14,7 @@ export async function generateText(prompt: string, model?: string): Promise<stri
   const modelId = model || config.huggingface.chatModel;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000); // 30s timeout
+  const timeout = setTimeout(() => controller.abort(), 8_000); // 8s timeout for Vercel
 
   try {
     const response = await fetch(`${HF_API}/${modelId}`, {

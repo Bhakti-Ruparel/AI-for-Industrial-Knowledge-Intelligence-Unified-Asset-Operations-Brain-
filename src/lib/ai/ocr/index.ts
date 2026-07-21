@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // OCR Service — PDF text extraction using pdf-parse v2
+// Gracefully handles environments where pdf-parse is not available
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { PDFParse, type TextResult } from "pdf-parse";
 import { createLogger } from "@/utils/logger";
 
 const logger = createLogger("ocr");
@@ -18,27 +18,30 @@ export async function extractText(buffer: Buffer, mimeType: string): Promise<OCR
   logger.info({ mimeType, sizeBytes: buffer.length }, "[OCR] extractText called");
 
   if (mimeType === "application/pdf") {
-    logger.info("[OCR] Parsing PDF with pdf-parse v2...");
-    const parser = new PDFParse(new Uint8Array(buffer));
-    const result: TextResult = await parser.getText();
-    const text = result.text.trim();
-    const pages = result.total || 1;
-    logger.info({ pages, textLength: text.length, first100: text.slice(0, 100) }, "[OCR] PDF extraction complete");
-    return {
-      text: text || "",
-      pages,
-      confidence: text.length > 50 ? 0.9 : text.length > 0 ? 0.5 : 0,
-      provider: "pdf-parse",
-    };
+    try {
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse(new Uint8Array(buffer));
+      const result = await parser.getText();
+      const text = result.text.trim();
+      const pages = result.total || 1;
+      logger.info({ pages, textLength: text.length, first100: text.slice(0, 100) }, "[OCR] PDF PASS");
+      return {
+        text: text || "",
+        pages,
+        confidence: text.length > 50 ? 0.9 : text.length > 0 ? 0.5 : 0,
+        provider: "pdf-parse",
+      };
+    } catch (e: any) {
+      logger.error({ error: e?.message, stack: e?.stack?.slice(0, 300) }, "[OCR] PDF FAIL");
+      return { text: "", pages: 1, confidence: 0, provider: "failed" };
+    }
   }
 
   if (mimeType.startsWith("image/")) {
-    logger.warn("[OCR] Image OCR not implemented");
     return { text: "", pages: 1, confidence: 0, provider: "none" };
   }
 
-  // Plain text / csv / other text formats
+  // Plain text
   const text = buffer.toString("utf-8").trim();
-  logger.info({ textLength: text.length }, "[OCR] Plain text extraction");
   return { text, pages: 1, confidence: 1.0, provider: "utf8" };
 }

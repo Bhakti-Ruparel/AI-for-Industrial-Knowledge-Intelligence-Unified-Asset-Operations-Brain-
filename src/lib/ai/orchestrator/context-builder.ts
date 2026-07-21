@@ -22,20 +22,27 @@ export async function buildContext(
 ): Promise<AgentContext> {
   let relevantChunks: string[] = [];
 
-  // Retrieve relevant document chunks via vector search
+  // Retrieve relevant document chunks via vector search (5s timeout)
   try {
-    const queryVector = await embed(query);
-    const results = await searchSimilar(queryVector, 5, {
-      must: [{ key: "organizationId", match: { value: organizationId } }],
-    });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Context building timed out")), 5000)
+    );
+    const searchPromise = (async () => {
+      const queryVector = await embed(query);
+      return searchSimilar(queryVector, 5, {
+        must: [{ key: "organizationId", match: { value: organizationId } }],
+      });
+    })();
+
+    const results = await Promise.race([searchPromise, timeoutPromise]);
     relevantChunks = results.map((r) => r.payload.content as string).filter(Boolean);
-  } catch (error) {
-    logger.warn({ error }, "Vector search unavailable for context building");
+  } catch (error: any) {
+    logger.warn({ error: error?.message }, "Vector search unavailable — skipping context");
   }
 
   return {
     relevantChunks,
-    equipmentContext: [], // TODO: Load from equipment memory
+    equipmentContext: [],
     conversationHistory: conversationHistory.slice(-6),
     organizationContext: { organizationId },
   };

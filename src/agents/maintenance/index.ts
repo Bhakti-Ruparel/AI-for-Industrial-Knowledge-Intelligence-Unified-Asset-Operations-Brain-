@@ -1,9 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Maintenance Agent — Real Prisma data + intelligent responses
+// Maintenance Agent — Fetches real Prisma data, uses LLM to synthesize responses
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import type { AgentDefinition, AgentInput, AgentOutput } from "@/lib/ai/orchestrator";
+import { synthesize } from "@/lib/ai/llm-synthesizer";
 import { prisma } from "@/lib/prisma";
+
+const SYSTEM_PROMPT = `You are a maintenance intelligence assistant for an industrial plant. Answer questions about maintenance tasks, schedules, overdue work orders, and equipment service needs. Use the provided database data to give accurate, actionable responses. Format with markdown. Be concise.`;
 
 export const maintenanceAgent: AgentDefinition = {
   id: "maintenance",
@@ -13,135 +16,80 @@ export const maintenanceAgent: AgentDefinition = {
 
   async execute(input: AgentInput): Promise<AgentOutput> {
     const { query, organizationId } = input;
-    const lower = query.toLowerCase();
 
     try {
-      // Pull live maintenance data from Prisma
-      const [overdue, inProgress, scheduled, completed, critical] = await Promise.all([
-        prisma?.maintenanceRecord.findMany({
+      if (!prisma) return { response: "Database unavailable.", confidence: 0.1, sources: [], actions: [] };
+
+      // Fetch all relevant maintenance data
+      const [overdue, inProgress, scheduled, completedCount, critical] = await Promise.all([
+        (prisma as any).maintenanceRecord.findMany({
           where: { organizationId, status: "OVERDUE", deletedAt: null },
           include: { equipment: { select: { name: true, model: true } } },
           orderBy: { scheduledDate: "asc" },
           take: 10,
-        }) ?? [],
-        prisma?.maintenanceRecord.findMany({
+        }),
+        (prisma as any).maintenanceRecord.findMany({
           where: { organizationId, status: "IN_PROGRESS", deletedAt: null },
           include: { equipment: { select: { name: true } } },
           take: 5,
-        }) ?? [],
-        prisma?.maintenanceRecord.findMany({
-          where: {
-            organizationId, status: "SCHEDULED", deletedAt: null,
-            scheduledDate: { lte: new Date(Date.now() + 7 * 86_400_000) },
-          },
+        }),
+        (prisma as any).maintenanceRecord.findMany({
+          where: { organizationId, status: "SCHEDULED", deletedAt: null, scheduledDate: { lte: new Date(Date.now() + 7 * 86_400_000) } },
           include: { equipment: { select: { name: true } } },
           orderBy: { scheduledDate: "asc" },
           take: 10,
-        }) ?? [],
-        prisma?.maintenanceRecord.count({
-          where: { organizationId, status: "COMPLETED", deletedAt: null },
-        }) ?? 0,
-        prisma?.maintenanceRecord.findMany({
+        }),
+        (prisma as any).maintenanceRecord.count({ where: { organizationId, status: "COMPLETED", deletedAt: null } }),
+        (prisma as any).maintenanceRecord.findMany({
           where: { organizationId, priority: "CRITICAL", status: { not: "COMPLETED" }, deletedAt: null },
           include: { equipment: { select: { name: true } } },
           take: 5,
-        }) ?? [],
+        }),
       ]);
 
-      // ── Overdue query ─────────────────────────────────────────────────────
-      if (lower.includes("overdue")) {
-        if (!overdue.length) {
-          return reply("No overdue maintenance tasks. All schedules are up to date. ✅", 0.95, [
-            { type: "view_maintenance", label: "View All Maintenance" },
-          ]);
-        }
-        const lines = [`**${overdue.length} Overdue Maintenance Task${overdue.length > 1 ? "s" : ""}:**\n`];
-        overdue.forEach((t, i) => {
-          const days = Math.floor((Date.now() - new Date(t.scheduledDate).getTime()) / 86_400_000);
-          lines.push(`${i + 1}. **${t.equipment?.name ?? t.equipmentId}** — ${t.title} *(${days} day${days !== 1 ? "s" : ""} overdue, ${t.priority} priority)*`);
-        });
-        lines.push("\n⚠️ Recommend prioritizing critical-priority tasks immediately.");
-        return reply(lines.join("\n"), 0.95, [
-          { type: "create_maintenance", label: "Schedule Maintenance" },
-          { type: "view_maintenance", label: "View All" },
-        ]);
-      }
+      const data = {
+        overdue: overdue.map((t: any) => ({ equipment: t.equipment?.name, title: t.title, priority: t.priority, scheduledDate: t.scheduledDate })),
+        inProgress: inProgress.map((t: any) => ({ equipment: t.equipment?.name, title: t.title, type: t.type })),
+        scheduledThisWeek: scheduled.map((t: any) => ({ equipment: t.equipment?.name, title: t.title, scheduledDate: t.scheduledDate, priority: t.priority })),
+        completedTotal: completedCount,
+        criticalTasks: critical.map((t: any) => ({ equipment: t.equipment?.name, title: t.title, status: t.status })),
+        totals: { overdue: overdue.length, inProgress: inProgress.length, scheduled: scheduled.length, completed: completedCount, critical: critical.length },
+      };
 
-      // ── Critical tasks ────────────────────────────────────────────────────
-      if (lower.includes("critical") || lower.includes("urgent") || lower.includes("priority")) {
-        if (!critical.length) {
-          return reply("No critical-priority maintenance tasks pending. All critical items are resolved. ✅", 0.93, []);
-        }
-        const lines = [`**${critical.length} Critical Maintenance Task${critical.length > 1 ? "s" : ""}:**\n`];
-        critical.forEach((t, i) => {
-          lines.push(`${i + 1}. **${t.equipment?.name ?? t.equipmentId}** — ${t.title} *(${t.status})*`);
-        });
-        return reply(lines.join("\n"), 0.93, [
-          { type: "view_maintenance", label: "View Tasks" },
-          { type: "create_maintenance", label: "Schedule Task" },
-        ]);
-      }
-
-      // ── Due soon / schedule ───────────────────────────────────────────────
-      if (lower.includes("due") || lower.includes("schedule") || lower.includes("upcoming") || lower.includes("this week")) {
-        if (!scheduled.length) {
-          return reply("No maintenance tasks due in the next 7 days.", 0.88, [
-            { type: "create_maintenance", label: "Schedule New Task" },
-          ]);
-        }
-        const lines = [`**${scheduled.length} Task${scheduled.length > 1 ? "s" : ""} Due in the Next 7 Days:**\n`];
-        scheduled.forEach((t, i) => {
-          const date = new Date(t.scheduledDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-          lines.push(`${i + 1}. **${t.equipment?.name ?? t.equipmentId}** — ${t.title} *(${date}, ${t.priority} priority)*`);
-        });
-        return reply(lines.join("\n"), 0.9, [
-          { type: "view_maintenance", label: "View Schedule" },
-          { type: "create_maintenance", label: "Add Task" },
-        ]);
-      }
-
-      // ── In progress ───────────────────────────────────────────────────────
-      if (lower.includes("in progress") || lower.includes("ongoing") || lower.includes("active")) {
-        if (!inProgress.length) {
-          return reply("No maintenance tasks currently in progress.", 0.88, [
-            { type: "view_maintenance", label: "View All Tasks" },
-          ]);
-        }
-        const lines = [`**${inProgress.length} Task${inProgress.length > 1 ? "s" : ""} Currently In Progress:**\n`];
-        inProgress.forEach((t, i) => {
-          lines.push(`${i + 1}. **${t.equipment?.name ?? t.equipmentId}** — ${t.title} *(${t.type}, ${t.priority} priority)*`);
-        });
-        return reply(lines.join("\n"), 0.9, [{ type: "view_maintenance", label: "View Details" }]);
-      }
-
-      // ── Summary / default ─────────────────────────────────────────────────
-      const total = (overdue.length) + (inProgress.length) + (scheduled.length) + (completed as number);
-      const lines = [
-        "**Maintenance Summary:**\n",
-        `📋 Total tasks: **${total}**`,
-        `🔴 Overdue: **${overdue.length}**`,
-        `⚙️ In Progress: **${inProgress.length}**`,
-        `📅 Due this week: **${scheduled.length}**`,
-        `✅ Completed: **${completed}**`,
-      ];
+      // Build fallback
+      const lines: string[] = ["**🔧 Maintenance Summary:**\n"];
+      lines.push(`- Overdue: **${overdue.length}**`);
+      lines.push(`- In Progress: **${inProgress.length}**`);
+      lines.push(`- Due this week: **${scheduled.length}**`);
+      lines.push(`- Completed: **${completedCount}**`);
       if (overdue.length > 0) {
-        lines.push(`\n⚠️ **${overdue.length} task${overdue.length > 1 ? "s" : ""} overdue** — immediate attention required.`);
+        lines.push(`\n**⚠️ Overdue Tasks:**`);
+        overdue.slice(0, 5).forEach((t: any, i: number) => {
+          lines.push(`${i + 1}. **${t.equipment?.name}** — ${t.title} *(${t.priority})*`);
+        });
       }
-      lines.push("\nAsk me about *overdue tasks*, *upcoming schedule*, *critical items*, or *specific equipment*.");
-      return reply(lines.join("\n"), 0.92, [
-        { type: "view_maintenance", label: "View All Tasks" },
-        { type: "create_maintenance", label: "Schedule Task" },
-        { type: "generate_checklist", label: "Generate Checklist" },
-      ]);
+      if (critical.length > 0) {
+        lines.push(`\n**🔴 Critical Priority:**`);
+        critical.forEach((t: any, i: number) => lines.push(`${i + 1}. **${t.equipment?.name}** — ${t.title}`));
+      }
+      if (scheduled.length > 0) {
+        lines.push(`\n**📅 Due This Week:**`);
+        scheduled.slice(0, 5).forEach((t: any, i: number) => {
+          const date = new Date(t.scheduledDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+          lines.push(`${i + 1}. **${t.equipment?.name}** — ${t.title} *(${date})*`);
+        });
+      }
+
+      const response = await synthesize({
+        question: query,
+        systemPrompt: SYSTEM_PROMPT,
+        data,
+        fallback: lines.join("\n"),
+      });
+
+      return { response, confidence: 0.9, sources: [], actions: [{ type: "view_maintenance", label: "View All Tasks" }] };
     } catch {
-      return reply(
-        "I'm having trouble connecting to the database right now. Please check your database connection and try again.",
-        0.3, []
-      );
+      return { response: "Unable to load maintenance data. Check your database connection.", confidence: 0.2, sources: [], actions: [] };
     }
   },
 };
-
-function reply(response: string, confidence: number, actions: { type: string; label: string }[]): AgentOutput {
-  return { response, confidence, sources: [], actions };
-}

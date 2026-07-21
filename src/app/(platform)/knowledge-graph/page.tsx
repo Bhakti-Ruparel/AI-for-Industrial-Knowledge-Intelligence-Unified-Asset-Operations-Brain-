@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchGraphNodes } from "@/services/api/knowledgeGraph";
+import { fetchGraphNodes, type KGNode } from "@/services/api/knowledgeGraph";
 import { useToast } from "@/components/ui/toast";
 // Note: We can omit importing ErrorState if we aren't using it anymore
 import { PageHeader } from "@/components/shared/page-header";
@@ -135,7 +135,7 @@ export default function KnowledgeGraphPage() {
   const [typeFilter,     setTypeFilter]     = useState<NodeType | "all">("all");
   const toast = useToast();
 
-  const { data: rawNodes, isLoading, isError, refetch } = useQuery({
+  const { data: rawData, isLoading, isError, refetch } = useQuery({
     queryKey: ["knowledge-graph", searchQuery || "all"],
     queryFn:  () => fetchGraphNodes(searchQuery || ""),
   });
@@ -144,13 +144,14 @@ export default function KnowledgeGraphPage() {
     if (isError) toast.warning("Knowledge graph", "Neo4j may not be configured. Showing data from Prisma.");
   }, [isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isUsingFallback = false; // No more fake data
-
   const allNodes: NodeItem[] = useMemo(
-    () => rawNodes && rawNodes.length > 0 ? assignPositions(rawNodes) : [],
-    [rawNodes]
+    () => rawData?.nodes && rawData.nodes.length > 0 ? assignPositions(rawData.nodes) : [],
+    [rawData]
   );
-  const allEdges: { from: string; to: string; label: string }[] = [];
+  const allEdges: { from: string; to: string; label: string }[] = useMemo(
+    () => rawData?.edges ?? [],
+    [rawData]
+  );
 
   // ── Filtered nodes ────────────────────────────────────────────────────────
   const displayNodes = useMemo(() => {

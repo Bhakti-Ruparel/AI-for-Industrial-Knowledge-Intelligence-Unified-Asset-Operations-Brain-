@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Planner — Selects which agent(s) to invoke based on query analysis
+// Planner — Smart agent routing based on query intent analysis
+// Routes queries to the right agent automatically — users never need to choose
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { agentManager } from "./agent-manager";
@@ -14,18 +15,77 @@ export interface ExecutionPlan {
   confidence: number;
 }
 
-const INTENT_PATTERNS: Record<string, { agents: string[]; keywords: string[] }> = {
-  knowledge: { agents: ["knowledge"], keywords: ["what", "how", "explain", "describe", "tell me", "information", "details"] },
-  maintenance: { agents: ["maintenance"], keywords: ["maintenance", "service", "repair", "schedule", "preventive", "lubrication", "overdue"] },
-  compliance: { agents: ["compliance"], keywords: ["compliance", "iso", "factory act", "peso", "oisd", "regulation", "audit", "certificate"] },
-  rca: { agents: ["rca"], keywords: ["root cause", "why did", "failure", "breakdown", "incident", "investigate"] },
-  recommendation: { agents: ["machine-recommendation"], keywords: ["recommend", "suggest", "which machine", "best for", "suitable"] },
-  booking: { agents: ["booking"], keywords: ["book", "enquiry", "lead", "order", "purchase", "buy", "quote"] },
-  lessons: { agents: ["lessons"], keywords: ["lessons", "learned", "pattern", "similar", "previous", "history", "trend"] },
-};
+// Priority-ordered intent rules — first match wins
+const INTENT_RULES: { intent: string; agent: string; patterns: RegExp[] }[] = [
+  // Maintenance — explicit maintenance keywords
+  {
+    intent: "maintenance",
+    agent: "maintenance",
+    patterns: [
+      /\b(maintenance|overdue|scheduled|preventive|corrective|work order|service task)/i,
+      /\b(lubrication|repair|calibrat)/i,
+      /maintenance (task|schedule|record|plan)/i,
+    ],
+  },
+  // Compliance — regulatory frameworks
+  {
+    intent: "compliance",
+    agent: "compliance",
+    patterns: [
+      /\b(compliance|regulation|iso|factory act|peso|oisd|audit|certificate|non.?compliant)/i,
+      /\b(violation|expir)/i,
+    ],
+  },
+  // RCA / Incidents — failure investigation
+  {
+    intent: "rca",
+    agent: "rca",
+    patterns: [
+      /\b(root cause|rca|incident|failure|breakdown|why did|investigate)/i,
+      /\b(open incident|critical incident|unresolved)/i,
+    ],
+  },
+  // Lessons learned — pattern analysis
+  {
+    intent: "lessons",
+    agent: "lessons",
+    patterns: [
+      /\b(lesson|learned|pattern|recurring|prevent|trend|historical)/i,
+    ],
+  },
+  // Machine recommendation
+  {
+    intent: "recommendation",
+    agent: "machine-recommendation",
+    patterns: [
+      /\b(recommend|suggest|which machine|best (for|machine)|suitable|vmc|vtl|cnc|grinding)/i,
+      /\b(\d+\s*[x×]\s*\d+|workpiece|material|tonnage)/i,
+    ],
+  },
+  // Booking / leads
+  {
+    intent: "booking",
+    agent: "booking",
+    patterns: [
+      /\b(book|enquir|lead|order|purchase|buy|quote|demo)/i,
+    ],
+  },
+  // Knowledge — document queries, equipment info, general questions (catch-all)
+  {
+    intent: "knowledge",
+    agent: "knowledge",
+    patterns: [
+      /\b(document|file|upload|pdf|manual|knowledge base|indexed)/i,
+      /\b(equipment|machine|health|status)/i,
+      /\b(summary|overview|how many|count|total|stats)/i,
+      /\b(what|how|explain|describe|tell me|show|list|find|search)/i,
+      /./,  // catch-all — everything unmatched goes to knowledge
+    ],
+  },
+];
 
 export function createPlan(query: string, agentHint?: string): ExecutionPlan {
-  // If explicit agent specified, use it
+  // If explicit agent specified, use it directly
   if (agentHint && agentManager.get(agentHint)) {
     return {
       primaryAgent: agentHint,
@@ -35,29 +95,30 @@ export function createPlan(query: string, agentHint?: string): ExecutionPlan {
     };
   }
 
-  // Analyze query intent
-  const lowerQuery = query.toLowerCase();
-  let bestMatch = { intent: "knowledge", score: 0 };
+  // Match against intent rules in priority order
+  for (const rule of INTENT_RULES) {
+    const matched = rule.patterns.some((pattern) => pattern.test(query));
+    if (matched) {
+      // Skip catch-all regex for confidence scoring
+      const specificMatches = rule.patterns.filter((p) => p.source !== "." && p.test(query)).length;
+      const confidence = Math.min(0.95, 0.6 + specificMatches * 0.15);
 
-  for (const [intent, config] of Object.entries(INTENT_PATTERNS)) {
-    const score = config.keywords.filter((kw) => lowerQuery.includes(kw)).length / config.keywords.length;
-    if (score > bestMatch.score) {
-      bestMatch = { intent, score };
+      logger.info({ intent: rule.intent, agent: rule.agent, confidence }, "Plan created");
+
+      return {
+        primaryAgent: rule.agent,
+        supportingAgents: [],
+        reasoning: `Intent: ${rule.intent} (confidence: ${confidence.toFixed(2)})`,
+        confidence,
+      };
     }
   }
 
-  const config = INTENT_PATTERNS[bestMatch.intent];
-  const primaryAgent = config.agents[0];
-
-  // Add supporting agents if confidence is low
-  const supportingAgents = bestMatch.score < 0.3 ? ["knowledge"] : [];
-
-  logger.info({ intent: bestMatch.intent, primaryAgent, confidence: bestMatch.score }, "Plan created");
-
+  // Absolute fallback
   return {
-    primaryAgent,
-    supportingAgents: supportingAgents.filter((a) => a !== primaryAgent),
-    reasoning: `Intent detected: ${bestMatch.intent} (score: ${bestMatch.score.toFixed(2)})`,
-    confidence: Math.max(bestMatch.score, 0.5),
+    primaryAgent: "knowledge",
+    supportingAgents: [],
+    reasoning: "No specific intent detected — using knowledge agent",
+    confidence: 0.5,
   };
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const priorityConfig: Record<string, { color: string; bg: string; border: string }> = {
   LOW:      { color: "text-blue-600",   bg: "bg-blue-50",   border: "border-blue-200/70"   },
   MEDIUM:   { color: "text-zinc-600",   bg: "bg-zinc-50",   border: "border-zinc-200/70"   },
@@ -40,7 +40,7 @@ type ListTab = (typeof LIST_TABS)[number];
 
 type ViewMode = "list" | "kanban";
 
-// ── Add Maintenance Task Modal ────────────────────────────────────────────────
+// â”€â”€ Add Maintenance Task Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface AddTaskModalProps {
   open: boolean;
   onClose: () => void;
@@ -149,7 +149,7 @@ function AddTaskModal({ open, onClose }: AddTaskModalProps) {
                 errors.equipmentId ? "border-red-400" : "border-zinc-200"
               )}
             >
-              <option value="">Select equipment…</option>
+              <option value="">Select equipmentâ€¦</option>
               {equipment.map((eq) => (
                 <option key={eq.id} value={eq.id}>{eq.name}</option>
               ))}
@@ -250,7 +250,7 @@ function AddTaskModal({ open, onClose }: AddTaskModalProps) {
               rows={2}
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Work to be done, parts needed, safety precautions…"
+              placeholder="Work to be done, parts needed, safety precautionsâ€¦"
               className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 resize-none focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all"
             />
           </div>
@@ -273,7 +273,7 @@ function AddTaskModal({ open, onClose }: AddTaskModalProps) {
               ) : (
                 <Calendar className="h-3.5 w-3.5" />
               )}
-              {mutation.isPending ? "Scheduling…" : "Schedule Task"}
+              {mutation.isPending ? "Schedulingâ€¦" : "Schedule Task"}
             </button>
           </div>
         </form>
@@ -282,7 +282,7 @@ function AddTaskModal({ open, onClose }: AddTaskModalProps) {
   );
 }
 
-// ── Task card (list view) ─────────────────────────────────────────────────────
+// â”€â”€ Task card (list view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TaskRow({ task }: { task: MaintenanceRecord }) {
   const [expanded, setExpanded] = useState(false);
   const priority  = priorityConfig[task.priority] ?? priorityConfig["MEDIUM"];
@@ -342,7 +342,7 @@ function TaskRow({ task }: { task: MaintenanceRecord }) {
             "text-[12px] font-bold block mt-1",
             task.status === "OVERDUE" ? "text-red-600" : "text-zinc-700"
           )}>
-            {task.scheduledDate ? new Date(task.scheduledDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+            {task.scheduledDate ? new Date(task.scheduledDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "â€”"}
           </span>
         </div>
 
@@ -373,7 +373,7 @@ function TaskRow({ task }: { task: MaintenanceRecord }) {
               </div>
             </div>
           ) : (
-            <span className="text-[11px] text-zinc-300 italic">—</span>
+            <span className="text-[11px] text-zinc-300 italic">â€”</span>
           )}
         </div>
 
@@ -409,7 +409,7 @@ function TaskRow({ task }: { task: MaintenanceRecord }) {
   );
 }
 
-// ── Kanban card ───────────────────────────────────────────────────────────────
+// â”€â”€ Kanban card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function KanbanCard({ task }: { task: MaintenanceRecord }) {
   const priority = priorityConfig[task.priority] ?? priorityConfig["MEDIUM"];
   const checklist = task.checklist ?? [];
@@ -438,7 +438,7 @@ function KanbanCard({ task }: { task: MaintenanceRecord }) {
       </div>
       <div className="flex items-center justify-between">
         <span className="text-[10px] text-zinc-400">
-          {task.scheduledDate ? new Date(task.scheduledDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+          {task.scheduledDate ? new Date(task.scheduledDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "â€”"}
         </span>
         <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">
           {(task.type || "").toLowerCase()}
@@ -465,7 +465,7 @@ function KanbanCard({ task }: { task: MaintenanceRecord }) {
   );
 }
 
-// ── Kanban column ─────────────────────────────────────────────────────────────
+// â”€â”€ Kanban column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function KanbanColumn({
   statusKey, tasks,
 }: {
@@ -500,7 +500,7 @@ function KanbanColumn({
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function MaintenancePage() {
   const [activeTab,  setActiveTab]  = useState<ListTab>("ALL");
   const [viewMode,   setViewMode]   = useState<ViewMode>("list");
@@ -520,9 +520,7 @@ export default function MaintenancePage() {
 
   // Safely extract the inner response object data array
   const apiData = (Array.isArray(data) ? data : (data as any)?.items ?? (data as any)?.data) as MaintenanceRecord[] | undefined;
-
-  // CRITICAL FALLBACK: If API throws an error OR successfully yields 0 records, render layout mockup cards
-  const allTasks: MaintenanceRecord[] = isError || !apiData || apiData.length === 0 ? SAMPLE_MAINTENANCE : apiData;
+  const allTasks: MaintenanceRecord[] = apiData ?? [];
 
   const overdueTasks = allTasks.filter((t) => t.status === "OVERDUE");
 
@@ -601,7 +599,7 @@ export default function MaintenancePage() {
               <div className="flex items-center gap-2 text-red-700">
                 <AlertTriangle className="h-4 w-4" />
                 <span className="text-[12px] font-bold uppercase tracking-wider">
-                  {overdueTasks.length} Overdue Task{overdueTasks.length > 1 ? "s" : ""} — Immediate Action Required
+                  {overdueTasks.length} Overdue Task{overdueTasks.length > 1 ? "s" : ""} â€” Immediate Action Required
                 </span>
               </div>
               {overdueTasks.slice(0, 3).map((task) => (
@@ -620,7 +618,7 @@ export default function MaintenancePage() {
                   <div className="text-right shrink-0">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Missed</p>
                     <p className="text-[12px] font-bold text-red-600 mt-0.5">
-                      {task.scheduledDate ? new Date(task.scheduledDate).toLocaleDateString("en-IN") : "—"}
+                      {task.scheduledDate ? new Date(task.scheduledDate).toLocaleDateString("en-IN") : "â€”"}
                     </p>
                   </div>
                 </div>
@@ -632,7 +630,7 @@ export default function MaintenancePage() {
           <FilterBar
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search by equipment, title, or description…"
+            searchPlaceholder="Search by equipment, title, or descriptionâ€¦"
             tabs={viewMode === "list" ? tabs : undefined}
             activeTab={viewMode === "list" ? activeTab : undefined}
             onTabChange={(key) => setActiveTab(key as ListTab)}
@@ -682,53 +680,3 @@ export default function MaintenancePage() {
     </div>
   );
 }
-
-// ── Fallback Dataset ──────────────────────────────────────────────────────────
-const SAMPLE_MAINTENANCE: MaintenanceRecord[] = [
-  {
-    id: "m1",
-    equipmentId: "eq-01",
-    equipmentName: "CNC Milling Machine Alpha",
-    title: "Hydraulic Fluid Replacement",
-    description: "Flushing out older low-viscosity fluid lines and installing clean synthetic fluid seals.",
-    type: "PREVENTIVE",
-    priority: "CRITICAL",
-    status: "OVERDUE",
-    scheduledDate: new Date(Date.now() - 86400000 * 4).toISOString(),
-    checklist: [
-      { id: "c1", task: "Drain old hydraulic reserve pump tank", completed: true },
-      { id: "c2", task: "Replace internal pleated particulate microfilter", completed: false },
-      { id: "c3", task: "Refill reservoir with approved grade fluid", completed: false }
-    ],
-    aiRecommendation: "Anomalous temperature peaks detected on main spindle motor. Replacing fluid right now prevents total thermal damage."
-  },
-  {
-    id: "m2",
-    equipmentId: "eq-02",
-    equipmentName: "Robotic Arm Welder 4",
-    title: "Joint Calibrations & Tuning",
-    description: "Recalibrating high-precision servo encoder offsets to optimize pathway geometric accuracies.",
-    type: "PREDICTIVE",
-    priority: "HIGH",
-    status: "IN_PROGRESS",
-    scheduledDate: new Date().toISOString(),
-    checklist: [
-      { id: "c4", task: "Lockout tagout robotic dynamic axis frame", completed: true },
-      { id: "c5", task: "Verify home coordinates alignment indices", completed: false }
-    ],
-    aiRecommendation: "Axis 3 tracking variation errors increased by 7% over recent workshifts. Immediate physical calibration advised."
-  },
-  {
-    id: "m3",
-    equipmentId: "eq-03",
-    equipmentName: "Laser Cutter Delta",
-    title: "Optics Assembly Cleaning",
-    description: "Inspecting and cleaning focusing mirrors and high-power lenses with specialized solvents.",
-    type: "PREVENTIVE",
-    priority: "MEDIUM",
-    status: "SCHEDULED",
-    scheduledDate: new Date(Date.now() + 86400000 * 2).toISOString(),
-    checklist: [],
-    aiRecommendation: undefined
-  }
-];

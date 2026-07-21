@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const statusConfig: Record<string, {
   icon:  typeof CheckCircle;
   color: string; bg: string; border: string; label: string;
@@ -40,41 +40,7 @@ const TABS = [
   { key: "PENDING_REVIEW", label: "Pending"      },
 ] as const;
 
-// ── Offline Fallback Sample Data ──────────────────────────────────────────────
-const SAMPLE_RECORDS: ComplianceRecord[] = [
-  {
-    id: "comp-1",
-    regulation: "ISO 14001:2015 EMS",
-    category: "ISO",
-    status: "COMPLIANT",
-    lastAuditDate: "12 Mar 2026",
-    nextAuditDate: "11 Mar 2027",
-    score: 94,
-    findings: []
-  },
-  {
-    id: "comp-2",
-    regulation: "PESO Pressure Vessel Safety Certificate",
-    category: "PESO",
-    status: "NON_COMPLIANT",
-    lastAuditDate: "05 Jan 2025",
-    nextAuditDate: "04 Jan 2026",
-    score: 62,
-    findings: ["Hydrostatic testing trace logs missing for Tank-04", "Manifold secondary release valves overdue for recalibration structural clearance"]
-  },
-  {
-    id: "comp-3",
-    regulation: "Air & Water Pollution Discharge Consent",
-    category: "ENVIRONMENTAL",
-    status: "EXPIRING",
-    lastAuditDate: "20 Aug 2025",
-    nextAuditDate: "15 Aug 2026",
-    score: 88,
-    findings: ["Efluent treatment unit telemetry setup requires routine patch update"]
-  }
-];
-
-// ── Add Compliance Record Modal ───────────────────────────────────────────────
+// â”€â”€ Add Compliance Record Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface AddComplianceModalProps {
   open: boolean;
   onClose: () => void;
@@ -122,7 +88,7 @@ function AddComplianceModal({ open, onClose }: AddComplianceModalProps) {
     const e: Record<string, string> = {};
     if (!form.regulation.trim()) e.regulation = "Regulation name is required";
     if (form.score && (Number(form.score) < 0 || Number(form.score) > 100))
-      e.score = "Score must be 0–100";
+      e.score = "Score must be 0â€“100";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -235,7 +201,7 @@ function AddComplianceModal({ open, onClose }: AddComplianceModalProps) {
           {/* Score */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
-              Compliance Score (0–100)
+              Compliance Score (0â€“100)
             </label>
             <input
               type="number"
@@ -293,7 +259,7 @@ function AddComplianceModal({ open, onClose }: AddComplianceModalProps) {
               ) : (
                 <Shield className="h-3.5 w-3.5" />
               )}
-              {mutation.isPending ? "Saving…" : "Add Record"}
+              {mutation.isPending ? "Savingâ€¦" : "Add Record"}
             </button>
           </div>
         </form>
@@ -302,7 +268,7 @@ function AddComplianceModal({ open, onClose }: AddComplianceModalProps) {
   );
 }
 
-// ── Score bar ─────────────────────────────────────────────────────────────────
+// â”€â”€ Score bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ScoreBar({ score }: { score: number }) {
   const color =
     score >= 85 ? "bg-emerald-500" :
@@ -321,7 +287,7 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
-// ── Compliance row ────────────────────────────────────────────────────────────
+// â”€â”€ Compliance row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ComplianceRow({ item }: { item: ComplianceRecord }) {
   const [expanded, setExpanded] = useState(false);
   const status    = statusConfig[item.status] ?? statusConfig["PENDING_REVIEW"];
@@ -373,7 +339,7 @@ function ComplianceRow({ item }: { item: ComplianceRecord }) {
         {/* Last Audit */}
         <div className="col-span-4 md:col-span-2">
           <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Last Audit</p>
-          <p className="text-[12px] font-bold text-zinc-700 mt-1">{item.lastAuditDate ?? "—"}</p>
+          <p className="text-[12px] font-bold text-zinc-700 mt-1">{item.lastAuditDate ?? "â€”"}</p>
         </div>
 
         {/* Next Audit */}
@@ -383,7 +349,7 @@ function ComplianceRow({ item }: { item: ComplianceRecord }) {
             "text-[12px] font-bold mt-1",
             item.status === "NON_COMPLIANT" || item.status === "EXPIRING" ? "text-red-600" : "text-zinc-700"
           )}>
-            {item.nextAuditDate ?? "—"}
+            {item.nextAuditDate ?? "â€”"}
           </p>
         </div>
 
@@ -392,7 +358,7 @@ function ComplianceRow({ item }: { item: ComplianceRecord }) {
           {item.score != null ? (
             <div className="flex-1"><ScoreBar score={item.score} /></div>
           ) : (
-            <span className="text-[11px] text-zinc-300">—</span>
+            <span className="text-[11px] text-zinc-300">â€”</span>
           )}
           {findings.length > 0 && (
             <button
@@ -423,7 +389,7 @@ function ComplianceRow({ item }: { item: ComplianceRecord }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function CompliancePage() {
   const [activeTab, setActiveTab] = useState("ALL");
   const [search,    setSearch]    = useState("");
@@ -442,9 +408,7 @@ export default function CompliancePage() {
 
   // Extract array securely regardless of endpoint layout payload mappings
   const apiData = (Array.isArray(data) ? data : (data as any)?.data ?? (data as any)?.items) as ComplianceRecord[] | undefined;
-  
-  // Pivot dynamically to simulated telemetry if array resolves empty
-  const records: ComplianceRecord[] = isError || !apiData || apiData.length === 0 ? SAMPLE_RECORDS : apiData;
+  const records: ComplianceRecord[] = apiData ?? [];
 
   const overallScore = records.length
     ? Math.round(records.reduce((a, c) => a + (c.score ?? 0), 0) / records.length)
@@ -551,7 +515,7 @@ export default function CompliancePage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Next Audit</p>
-                    <p className="text-[11px] font-bold text-red-600 mt-0.5">{v.nextAuditDate ?? "—"}</p>
+                    <p className="text-[11px] font-bold text-red-600 mt-0.5">{v.nextAuditDate ?? "â€”"}</p>
                   </div>
                 </div>
               ))}
@@ -562,7 +526,7 @@ export default function CompliancePage() {
           <FilterBar
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search by regulation or category…"
+            searchPlaceholder="Search by regulation or categoryâ€¦"
             tabs={tabs}
             activeTab={activeTab}
             onTabChange={setActiveTab}

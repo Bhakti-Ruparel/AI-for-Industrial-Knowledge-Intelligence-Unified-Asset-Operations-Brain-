@@ -14,24 +14,14 @@ import {
 import { cn } from "@/lib/utils";
 import type { ChatMessage, Source } from "@/types";
 
-// ── Agent type chips ──────────────────────────────────────────────────────────
-const AGENT_TYPES = [
-  { key: "knowledge",       label: "Knowledge Search" },
-  { key: "maintenance",     label: "Maintenance"      },
-  { key: "compliance",      label: "Compliance"       },
-  { key: "rca",             label: "Root Cause"       },
-  { key: "recommendation",  label: "Machine Rec."     },
-  { key: "booking",         label: "Booking"          },
-] as const;
-type AgentType = typeof AGENT_TYPES[number]["key"];
-
 // ── Suggested prompts ─────────────────────────────────────────────────────────
 const SUGGESTED_PROMPTS = [
-  "What machine is best for automotive die manufacturing?",
-  "Show me overdue maintenance tasks",
-  "Analyze compliance gaps for ISO 9001",
-  "Recommend a VMC for 800×500×400mm workpiece",
-  "What are the most recent incidents?",
+  "What are the latest documents uploaded?",
+  "Show overdue maintenance tasks",
+  "What equipment needs attention?",
+  "Check compliance status",
+  "Are there any open incidents?",
+  "Give me a system overview",
 ];
 
 // ── Message bubble ────────────────────────────────────────────────────────────
@@ -155,7 +145,6 @@ export default function CopilotPage() {
   const [input,          setInput]          = useState("");
   const [messages,       setMessages]       = useState<ChatMessage[]>([]);
   const [showSources,    setShowSources]    = useState(true);
-  const [activeAgent,    setActiveAgent]    = useState<AgentType | null>(null);
   const [activeChat,     setActiveChat]     = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<Source | null>(null);
   const [conversationId, setConversationId] = useState(() => `conv_${Date.now()}`);
@@ -174,7 +163,7 @@ export default function CopilotPage() {
 
   const chatMutation = useMutation({
     mutationFn: (message: string) =>
-      sendChatMessage(message, conversationId, activeAgent ?? undefined),
+      sendChatMessage(message, conversationId, undefined),
     onSuccess: (data) => {
       // Update conversationId from server response (DB-assigned ID)
       if (data.conversationId && data.conversationId !== conversationId) {
@@ -324,23 +313,9 @@ export default function CopilotPage() {
             </button>
           </div>
 
-          {/* Agent selector */}
-          <div className="border-b border-zinc-50 px-5 py-2.5 flex items-center gap-2 overflow-x-auto shrink-0">
-            <span className="text-[11px] text-zinc-400 font-medium shrink-0">Agent:</span>
-            {AGENT_TYPES.map((agent) => (
-              <button
-                key={agent.key}
-                onClick={() => setActiveAgent((prev) => prev === agent.key ? null : agent.key)}
-                className={cn(
-                  "shrink-0 rounded-xl border px-3 py-1 text-[11px] font-semibold transition-all",
-                  activeAgent === agent.key
-                    ? "bg-[#FF6B2C] text-white border-[#FF6B2C] shadow-xs"
-                    : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
-                )}
-              >
-                {agent.label}
-              </button>
-            ))}
+          {/* Agent routing info — auto mode */}
+          <div className="border-b border-zinc-50 px-5 py-2 flex items-center gap-2 shrink-0">
+            <span className="text-[11px] text-zinc-400 font-medium">🤖 Auto-routing — I detect your intent and pick the right agent</span>
           </div>
 
           {/* Messages — scrollable area */}

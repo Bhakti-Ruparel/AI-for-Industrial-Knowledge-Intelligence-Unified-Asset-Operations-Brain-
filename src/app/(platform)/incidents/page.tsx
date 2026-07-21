@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const severityConfig: Record<string, { color: string; bg: string; border: string }> = {
   LOW:      { color: "text-blue-700",   bg: "bg-blue-50",   border: "border-blue-200/70"   },
   MEDIUM:   { color: "text-amber-700",  bg: "bg-amber-50",  border: "border-amber-200/70"  },
@@ -50,7 +50,7 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-// ── Report Incident Modal ─────────────────────────────────────────────────────
+// â”€â”€ Report Incident Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface ReportModalProps {
   open: boolean;
   onClose: () => void;
@@ -165,7 +165,7 @@ function ReportIncidentModal({ open, onClose, onSuccess }: ReportModalProps) {
                 errors.equipmentId ? "border-red-400" : "border-zinc-200"
               )}
             >
-              <option value="">Select equipment…</option>
+              <option value="">Select equipmentâ€¦</option>
               {equipment.map((eq) => (
                 <option key={eq.id} value={eq.id}>{eq.name}</option>
               ))}
@@ -209,7 +209,7 @@ function ReportIncidentModal({ open, onClose, onSuccess }: ReportModalProps) {
               rows={3}
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Describe the incident in detail — what happened, when, observed symptoms…"
+              placeholder="Describe the incident in detail â€” what happened, when, observed symptomsâ€¦"
               className={cn(
                 "w-full rounded-xl border px-3.5 py-2.5 text-[13px] text-zinc-900 placeholder-zinc-300 resize-none",
                 "focus:outline-none focus:ring-2 focus:ring-[#FF6B2C]/30 focus:border-[#FF6B2C] transition-all",
@@ -238,7 +238,7 @@ function ReportIncidentModal({ open, onClose, onSuccess }: ReportModalProps) {
               ) : (
                 <AlertTriangle className="h-3.5 w-3.5" />
               )}
-              {mutation.isPending ? "Reporting…" : "Report Incident"}
+              {mutation.isPending ? "Reportingâ€¦" : "Report Incident"}
             </button>
           </div>
         </form>
@@ -247,7 +247,7 @@ function ReportIncidentModal({ open, onClose, onSuccess }: ReportModalProps) {
   );
 }
 
-// ── Incident row ──────────────────────────────────────────────────────────────
+// â”€â”€ Incident row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function IncidentRow({ incident }: { incident: IncidentRecord }) {
   const [expanded, setExpanded] = useState(false);
   const severity   = severityConfig[incident.severity] ?? severityConfig["MEDIUM"];
@@ -378,7 +378,7 @@ function IncidentRow({ incident }: { incident: IncidentRecord }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function IncidentsPage() {
   const [activeTab, setActiveTab] = useState("ALL");
   const [search,    setSearch]    = useState("");
@@ -397,9 +397,7 @@ export default function IncidentsPage() {
 
   // Handle structural mutations safely from remote database arrays
   const apiData = (Array.isArray(data) ? data : (data as any)?.data ?? (data as any)?.items) as IncidentRecord[] | undefined;
-  
-  // Use data mockup if API query fails or yields empty records
-  const allIncidents: IncidentRecord[] = isError || !apiData || apiData.length === 0 ? SAMPLE_INCIDENTS : apiData;
+  const allIncidents: IncidentRecord[] = apiData ?? [];
 
   const criticalUnresolved = allIncidents.filter(
     (i) => (i.severity === "CRITICAL" || i.severity === "HIGH") &&
@@ -492,7 +490,7 @@ export default function IncidentsPage() {
           <FilterBar
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search by title, equipment, or description…"
+            searchPlaceholder="Search by title, equipment, or descriptionâ€¦"
             tabs={tabs}
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -530,57 +528,3 @@ export default function IncidentsPage() {
   );
 }
 
-// ── Fallback Dataset ──────────────────────────────────────────────────────────
-const SAMPLE_INCIDENTS: IncidentRecord[] = [
-  {
-    id: "inc-1",
-    title: "Spindle overheating error code E-104",
-    description: "Main drive axis assembly temperature crossed 95°C under continuous milling load cycles.",
-    equipmentId: "eq-01",
-    equipmentName: "CNC Milling Machine Alpha",
-    severity: "CRITICAL",
-    status: "OPEN",
-    reportedAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(), // 25 mins ago
-    rootCause: "Coolant bypass valve failed to actuate due to physical debris buildup.",
-    evidence: [
-      { id: "ev-1", type: "sensor_data", title: "Thermal telemetry logs" },
-      { id: "ev-2", type: "image", title: "Scuffed bearing mount photo" }
-    ],
-    timeline: [
-      { id: "t-1", description: "Automated telemetry alert generated by edge node.", user: "System", timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString() },
-      { id: "t-2", description: "Machine safely isolated and shut down manually.", user: "R. Sharma (Operator)", timestamp: new Date(Date.now() - 1000 * 60 * 18).toISOString() }
-    ]
-  },
-  {
-    id: "inc-2",
-    title: "Servo controller connection drops",
-    description: "Intermittent packet drops detected across etherCAT ring network configuration.",
-    equipmentId: "eq-02",
-    equipmentName: "Robotic Arm Welder 4",
-    severity: "HIGH",
-    status: "INVESTIGATING",
-    reportedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(), // 3 hours ago
-    rootCause: undefined,
-    evidence: [
-      { id: "ev-3", type: "document", title: "Packet drop diagnostics dump" }
-    ],
-    timeline: [
-      { id: "t-3", description: "Network ping drop errors registered.", user: "System", timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString() }
-    ]
-  },
-  {
-    id: "inc-3",
-    title: "Assist gas pressure drop",
-    description: "Nitrogen output auxiliary tank tank pressures falling below acceptable levels.",
-    equipmentId: "eq-03",
-    equipmentName: "Laser Cutter Delta",
-    severity: "MEDIUM",
-    status: "RESOLVED",
-    reportedAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString(), // ~1d ago
-    rootCause: "Loose coupling thread seal on manifold sub-line assembly.",
-    evidence: [],
-    timeline: [
-      { id: "t-4", description: "Coupling tightened and pressure holds solid.", user: "A. Khan (Tech)", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 28).toISOString() }
-    ]
-  }
-];

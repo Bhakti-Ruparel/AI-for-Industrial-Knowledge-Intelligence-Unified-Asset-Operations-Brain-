@@ -20,9 +20,9 @@ export function ChartCard({
 }: ChartCardProps) {
   return (
     <div className={cn(
-      "rounded-[20px] bg-white border border-[#F3F4F6]",
+      "rounded-[20px] bg-white border border-[#F3F4F6] min-w-0",
       "shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)]",
-      "transition-shadow duration-300",
+      "transition-shadow duration-300 overflow-hidden",
       !noPadding && "p-6",
       className
     )}>
@@ -44,8 +44,8 @@ export function ChartCard({
         </div>
       ) : (
         <div
-          className={cn(noPadding && "px-6 pb-6")}
-          style={{ height }}
+          className={cn("relative", noPadding && "px-6 pb-6")}
+          style={{ height, width: "100%" }}
         >
           {children}
         </div>

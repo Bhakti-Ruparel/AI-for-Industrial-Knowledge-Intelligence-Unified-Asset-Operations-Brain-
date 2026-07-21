@@ -14,12 +14,25 @@ export interface KGNode {
   neo4jId?: string;
 }
 
-export async function fetchGraphNodes(query = ""): Promise<KGNode[]> {
-  const params = query ? `?query=${encodeURIComponent(query)}` : "?query=equipment";
+export interface KGEdge {
+  from:  string;
+  to:    string;
+  label: string;
+}
+
+export interface KGGraphData {
+  nodes: KGNode[];
+  edges: KGEdge[];
+}
+
+export async function fetchGraphNodes(query = ""): Promise<KGGraphData> {
+  const params = query ? `?query=${encodeURIComponent(query)}` : "?query=all";
   const res = await authFetch(`${API}/knowledge-graph${params}`);
   if (!res.ok) throw new Error(`Failed to fetch knowledge graph: ${res.status}`);
   const json = await res.json();
-  return json.data ?? [];
+  // Handle both { nodes, edges } shape and legacy flat array
+  if (Array.isArray(json.data)) return { nodes: json.data, edges: [] };
+  return { nodes: json.data?.nodes ?? [], edges: json.data?.edges ?? [] };
 }
 
 export async function createGraphNode(data: {

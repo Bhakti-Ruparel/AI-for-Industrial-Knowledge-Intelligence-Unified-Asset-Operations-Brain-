@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ── Theme & Config ────────────────────────────────────────────────────────────
+// â”€â”€ Theme & Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const tooltipStyle = {
   background: "#fff",
   border: "1px solid #F3F4F6",
@@ -38,7 +38,7 @@ const CHART_COLORS = [
   "#F59E0B", "#8B5CF6", "#EC4899",
 ];
 
-// ── KPI card ──────────────────────────────────────────────────────────────────
+// â”€â”€ KPI card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface KpiCardProps {
   title: string;
   value: string;
@@ -77,7 +77,7 @@ function KpiCard({
   );
 }
 
-// ── Gauge ring ────────────────────────────────────────────────────────────────
+// â”€â”€ Gauge ring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function GaugeRing({ value, max = 100, label }: { value: number; max?: number; label?: string }) {
   const pct   = Math.min(Math.max(0, value) / max, 1);
   const color =
@@ -107,7 +107,7 @@ function GaugeRing({ value, max = 100, label }: { value: number; max?: number; l
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AnalyticsPage() {
   const toast = useToast();
 
@@ -140,7 +140,7 @@ export default function AnalyticsPage() {
     },
     {
       title:       "Avg Resolution Time",
-      value:       metrics.incidents.mttr > 0 ? `${metrics.incidents.mttr} hrs` : "—",
+      value:       metrics.incidents.mttr > 0 ? `${metrics.incidents.mttr} hrs` : "â€”",
       change:      metrics.incidents.resolved,
       positive:    true,
       changeLabel: `${metrics.incidents.resolved} resolved`,
@@ -173,7 +173,7 @@ export default function AnalyticsPage() {
   const fillPercentage = queriesTotal > 0 ? Math.min(100, (queriesToday / queriesTotal) * 100 * 30) : 0;
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto">
+    <div className="space-y-6 max-w-[1400px] mx-auto overflow-hidden">
       <PageHeader
         title="Analytics"
         subtitle="Performance metrics, usage statistics, and operational intelligence."
@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
       {isLoading ? (
         <KPISkeleton count={6} />
       ) : (
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 grid-cols-1 lg:grid-cols-2 lg:grid-cols-3">
           {kpis.map((kpi) => <KpiCard key={kpi.title} {...kpi} />)}
         </div>
       )}
@@ -208,14 +208,14 @@ export default function AnalyticsPage() {
       )}
 
       {isLoading && (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => <Shimmer key={i} className="h-20 rounded-2xl" />)}
         </div>
       )}
 
       {/* Tabbed charts */}
       <Tabs defaultValue="equipment" className="space-y-5">
-        <TabsList className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-1 h-auto gap-1 flex-wrap">
+        <TabsList className="w-full rounded-xl border border-zinc-200 bg-zinc-50/80 p-1 h-auto gap-1 flex-wrap justify-start">
           {["equipment", "documents", "maintenance", "incidents", "compliance", "ai"].map((tab) => (
             <TabsTrigger
               key={tab}
@@ -227,9 +227,9 @@ export default function AnalyticsPage() {
           ))}
         </TabsList>
 
-        {/* ── Equipment ── */}
+        {/* â”€â”€ Equipment â”€â”€ */}
         <TabsContent value="equipment" className="space-y-5">
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
             <ChartCard title="Equipment Health Trend (30 days)" subtitle="Average health score across all machines" loading={lHealth} height={240}>
               {healthTrend.length === 0 || healthTrend.every((d) => d.value === 0) ? (
                 <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
@@ -250,7 +250,7 @@ export default function AnalyticsPage() {
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#9CA3AF" }} unit="%" />
                   <Tooltip 
                     contentStyle={tooltipStyle} 
-                    formatter={(v: unknown) => [typeof v === "number" ? `${v.toFixed(1)}%` : "—", "Health"]} 
+                    formatter={(v: unknown) => [typeof v === "number" ? `${v.toFixed(1)}%` : "â€”", "Health"]} 
                   />
                   <Area type="monotone" dataKey="value" stroke="#FF6B2C" strokeWidth={2} fill="url(#hGrad)" dot={false} activeDot={{ r: 4, fill: "#FF6B2C" }} />
                 </AreaChart>
@@ -265,14 +265,14 @@ export default function AnalyticsPage() {
                   <p className="text-[12px] text-zinc-400">No equipment registered yet.</p>
                 </div>
               ) : metrics && (
-                <div className="flex items-center justify-center gap-10 h-full">
+                <div className="flex items-center justify-center gap-6 sm:gap-10 h-full flex-wrap">
                   {[
                     { label: "Operational",  value: metrics.equipment.operational, color: "#22C55E" },
                     { label: "Maintenance",  value: Math.max(0, metrics.equipment.total - metrics.equipment.operational - metrics.equipment.critical), color: "#F59E0B" },
                     { label: "Critical",     value: metrics.equipment.critical,    color: "#EF4444" },
                   ].map((item) => (
                     <div key={item.label} className="text-center">
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full text-white text-xl font-bold shadow-[0_4px_12px_rgba(0,0,0,0.15)]" style={{ background: item.color }}>
+                      <div className="mx-auto flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full text-white text-lg sm:text-xl font-bold shadow-[0_4px_12px_rgba(0,0,0,0.15)]" style={{ background: item.color }}>
                         {Math.max(0, item.value)}
                       </div>
                       <p className="mt-2.5 text-[11px] text-zinc-500 font-medium">{item.label}</p>
@@ -284,9 +284,9 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
 
-        {/* ── Documents ── */}
+        {/* â”€â”€ Documents â”€â”€ */}
         <TabsContent value="documents" className="space-y-5">
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
             <ChartCard title="Documents by Type" loading={lDocs} height={260}>
               {docsByType.length === 0 ? (
                 <div className="flex h-full items-center justify-center flex-col gap-2 text-center">
@@ -340,7 +340,7 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
 
-        {/* ── Maintenance ── */}
+        {/* â”€â”€ Maintenance â”€â”€ */}
         <TabsContent value="maintenance" className="space-y-5">
           <ChartCard title="Maintenance Cost by Type (6 months)" subtitle="Breakdown of preventive, corrective, and predictive costs" loading={lCost} height={300}>
             {maintCost.every((d) => d.preventive === 0 && d.corrective === 0 && d.predictive === 0) ? (
@@ -353,8 +353,8 @@ export default function AnalyticsPage() {
               <BarChart data={maintCost} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} tickFormatter={(v: number) => v > 0 ? `₹${(v / 1000).toFixed(0)}k` : "0"} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [typeof v === "number" ? `₹${v.toLocaleString("en-IN")}` : "—", ""]} />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} tickFormatter={(v: number) => v > 0 ? `â‚¹${(v / 1000).toFixed(0)}k` : "0"} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [typeof v === "number" ? `â‚¹${v.toLocaleString("en-IN")}` : "â€”", ""]} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="preventive" name="Preventive" stackId="a" fill="#22C55E" />
                 <Bar dataKey="corrective" name="Corrective"  stackId="a" fill="#EF4444" />
@@ -365,7 +365,7 @@ export default function AnalyticsPage() {
           </ChartCard>
         </TabsContent>
 
-        {/* ── Incidents ── */}
+        {/* â”€â”€ Incidents â”€â”€ */}
         <TabsContent value="incidents" className="space-y-5">
           <ChartCard title="Incident Trend (30 days)" subtitle="Daily incident count over the past month" loading={lIncident} height={300}>
             {incidentTrend.every((d) => d.value === 0) ? (
@@ -393,9 +393,9 @@ export default function AnalyticsPage() {
           </ChartCard>
         </TabsContent>
 
-        {/* ── Compliance ── */}
+        {/* â”€â”€ Compliance â”€â”€ */}
         <TabsContent value="compliance" className="space-y-5">
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
             <ChartCard title="Compliance Status" loading={isLoading} height={280}>
               {metrics && complianceData.length > 0 && (
                 <ResponsiveContainer width="100%" height="100%">
@@ -421,7 +421,7 @@ export default function AnalyticsPage() {
                 <>
                   <GaugeRing value={metrics.compliance.overallScore} label="Score" />
                   <p className="text-center text-[12px] text-zinc-500 mt-2">
-                    {metrics.compliance.compliant} compliant · {metrics.compliance.nonCompliant} violations · {metrics.compliance.expiring} expiring
+                    {metrics.compliance.compliant} compliant Â· {metrics.compliance.nonCompliant} violations Â· {metrics.compliance.expiring} expiring
                   </p>
                 </>
               )}
@@ -429,9 +429,9 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
 
-        {/* ── AI Usage ── */}
+        {/* â”€â”€ AI Usage â”€â”€ */}
         <TabsContent value="ai" className="space-y-5">
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
             <ChartCard title="AI Query Volume" subtitle="Queries today vs. all-time" loading={isLoading} height={280}>
               {metrics && (
                 <div className="flex flex-col items-center justify-center h-full gap-4">

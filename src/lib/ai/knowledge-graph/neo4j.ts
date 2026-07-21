@@ -9,22 +9,35 @@ const logger = createLogger("neo4j");
 
 let driver: Driver | null = null;
 
-function getDriver(): Driver {
+function getDriver(): Driver | null {
   if (!driver) {
     const uri      = process.env.NEO4J_URI      || "";
     const user     = process.env.NEO4J_USER     || "neo4j";
     const password = process.env.NEO4J_PASSWORD || "";
 
     if (!uri || !password) {
-      logger.warn("NEO4J_URI or NEO4J_PASSWORD environment variables are not set");
+      logger.warn("NEO4J_URI or NEO4J_PASSWORD not configured — graph queries disabled");
+      return null;
     }
 
-    driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+    try {
+      driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+    } catch (e) {
+      logger.error({ e }, "Failed to create Neo4j driver");
+      return null;
+    }
   }
   return driver;
 }
-function getSession(): Session {
-  return getDriver().session();
+
+function getSession(): Session | null {
+  const d = getDriver();
+  if (!d) return null;
+  try {
+    return d.session();
+  } catch {
+    return null;
+  }
 }
 
 export interface GraphNode {
@@ -44,6 +57,7 @@ export interface GraphEdge {
 
 export async function createNode(node: Omit<GraphNode, "id">): Promise<GraphNode> {
   const session = getSession();
+  if (!session) throw new Error("Neo4j not configured");
   try {
     const result = await session.run(
       `CREATE (n:${node.type} {label: $label, organizationId: $orgId}) SET n += $props RETURN n, id(n) as nodeId`,
@@ -63,6 +77,7 @@ export async function createNode(node: Omit<GraphNode, "id">): Promise<GraphNode
 
 export async function createEdge(from: string, to: string, relationship: string, properties: Record<string, unknown> = {}): Promise<void> {
   const session = getSession();
+  if (!session) throw new Error("Neo4j not configured");
   try {
     await session.run(
       `MATCH (a) WHERE id(a) = $fromId MATCH (b) WHERE id(b) = $toId CREATE (a)-[r:${relationship}]->(b) SET r += $props`,
@@ -75,6 +90,7 @@ export async function createEdge(from: string, to: string, relationship: string,
 
 export async function findRelated(nodeId: string, depth: number = 2): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
   const session = getSession();
+  if (!session) return { nodes: [], edges: [] };
   try {
     const result = await session.run(
       `MATCH path = (n)-[*1..${depth}]-(m) WHERE id(n) = $nodeId RETURN nodes(path) as nodes, relationships(path) as rels`,
@@ -117,6 +133,7 @@ export async function findRelated(nodeId: string, depth: number = 2): Promise<{ 
 
 export async function searchGraph(query: string, organizationId: string): Promise<GraphNode[]> {
   const session = getSession();
+  if (!session) return [];
   try {
     const result = await session.run(
       `MATCH (n) WHERE n.organizationId = $orgId AND (n.label CONTAINS $query OR any(key IN keys(n) WHERE toString(n[key]) CONTAINS $query)) RETURN n, labels(n) as labels, id(n) as nodeId LIMIT 20`,

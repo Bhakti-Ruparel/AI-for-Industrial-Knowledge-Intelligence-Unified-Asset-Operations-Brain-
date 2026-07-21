@@ -14,6 +14,104 @@ import {
 import { cn } from "@/lib/utils";
 import type { ChatMessage, Source } from "@/types";
 
+// ── Simple markdown renderer ──────────────────────────────────────────────────
+function renderMarkdown(text: string): React.ReactNode {
+  // Split into lines and process each
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+
+  lines.forEach((line, i) => {
+    let processed: React.ReactNode = line;
+
+    // Headers
+    if (line.startsWith("### ")) {
+      elements.push(<h4 key={i} className="font-semibold text-zinc-900 mt-3 mb-1 text-[13px]">{parseInline(line.slice(4))}</h4>);
+      return;
+    }
+    if (line.startsWith("## ")) {
+      elements.push(<h3 key={i} className="font-bold text-zinc-900 mt-3 mb-1 text-[14px]">{parseInline(line.slice(3))}</h3>);
+      return;
+    }
+
+    // Bullet points
+    if (line.match(/^[\-•]\s/)) {
+      elements.push(<div key={i} className="flex gap-2 ml-1"><span className="text-zinc-400 shrink-0">•</span><span>{parseInline(line.slice(2))}</span></div>);
+      return;
+    }
+    // Numbered lists
+    if (line.match(/^\d+\.\s/)) {
+      const num = line.match(/^(\d+)\./)?.[1];
+      const content = line.replace(/^\d+\.\s/, "");
+      elements.push(<div key={i} className="flex gap-2 ml-1"><span className="text-zinc-400 shrink-0 font-medium text-[12px] min-w-[16px]">{num}.</span><span>{parseInline(content)}</span></div>);
+      return;
+    }
+
+    // Horizontal rule
+    if (line.match(/^---+$/)) {
+      elements.push(<hr key={i} className="border-zinc-100 my-2" />);
+      return;
+    }
+
+    // Empty line
+    if (!line.trim()) {
+      elements.push(<div key={i} className="h-2" />);
+      return;
+    }
+
+    // Regular paragraph
+    elements.push(<p key={i}>{parseInline(line)}</p>);
+  });
+
+  return <>{elements}</>;
+}
+
+function parseInline(text: string): React.ReactNode {
+  // Parse **bold**, *italic*, and `code`
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let keyIdx = 0;
+
+  while (remaining.length > 0) {
+    // Bold **text**
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    // Italic *text*
+    const italicMatch = remaining.match(/(?<!\*)\*([^*]+?)\*(?!\*)/);
+    // Code `text`
+    const codeMatch = remaining.match(/`(.+?)`/);
+
+    // Find earliest match
+    const matches = [
+      boldMatch ? { type: "bold", match: boldMatch, idx: remaining.indexOf(boldMatch[0]) } : null,
+      italicMatch ? { type: "italic", match: italicMatch, idx: remaining.indexOf(italicMatch[0]) } : null,
+      codeMatch ? { type: "code", match: codeMatch, idx: remaining.indexOf(codeMatch[0]) } : null,
+    ].filter(Boolean).sort((a, b) => a!.idx - b!.idx);
+
+    if (matches.length === 0) {
+      parts.push(remaining);
+      break;
+    }
+
+    const first = matches[0]!;
+    // Text before match
+    if (first.idx > 0) {
+      parts.push(remaining.slice(0, first.idx));
+    }
+
+    // Render the match
+    if (first.type === "bold") {
+      parts.push(<strong key={keyIdx++} className="font-semibold text-zinc-900">{first.match![1]}</strong>);
+    } else if (first.type === "italic") {
+      parts.push(<em key={keyIdx++} className="italic text-zinc-600">{first.match![1]}</em>);
+    } else if (first.type === "code") {
+      parts.push(<code key={keyIdx++} className="px-1.5 py-0.5 rounded bg-zinc-100 text-[12px] font-mono text-zinc-700">{first.match![1]}</code>);
+    }
+
+    remaining = remaining.slice(first.idx + first.match![0].length);
+  }
+
+  return parts.length === 1 && typeof parts[0] === "string" ? parts[0] : <>{parts}</>;
+}
+
 // ── Suggested prompts ─────────────────────────────────────────────────────────
 const SUGGESTED_PROMPTS = [
   "What are the latest documents uploaded?",
@@ -58,7 +156,9 @@ function MessageBubble({
         </div>
 
         {/* Content */}
-        <p className="text-[13px] text-zinc-800 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+        <div className="text-[13px] text-zinc-800 leading-relaxed whitespace-pre-wrap [&_strong]:font-bold [&_em]:italic">
+          {isUser ? msg.content : renderMarkdown(msg.content)}
+        </div>
 
         {/* Sources */}
         {!isUser && sources.length > 0 && (

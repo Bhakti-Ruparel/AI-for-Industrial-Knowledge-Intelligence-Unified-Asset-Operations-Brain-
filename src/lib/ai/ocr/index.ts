@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// OCR Service — Text extraction abstraction
-// Supports PDF text extraction and image OCR
-// Provider can be swapped (Tesseract, Google Vision, AWS Textract)
+// OCR Service — PDF text extraction using pdf-parse v2
 // ═══════════════════════════════════════════════════════════════════════════════
 
+import { PDFParse, type TextResult } from "pdf-parse";
 import { createLogger } from "@/utils/logger";
 
 const logger = createLogger("ocr");
@@ -15,58 +14,31 @@ export interface OCRResult {
   provider: string;
 }
 
-export interface OCRProvider {
-  name: string;
-  extractText(buffer: Buffer, mimeType: string): Promise<OCRResult>;
-}
+export async function extractText(buffer: Buffer, mimeType: string): Promise<OCRResult> {
+  logger.info({ mimeType, sizeBytes: buffer.length }, "[OCR] extractText called");
 
-// Default provider — basic text extraction (expandable)
-class DefaultOCRProvider implements OCRProvider {
-  name = "default";
-
-  async extractText(buffer: Buffer, mimeType: string): Promise<OCRResult> {
-    logger.info({ mimeType, size: buffer.length }, "Extracting text");
-
-    // For PDFs — extract raw text (placeholder for pdf-parse or similar)
-    if (mimeType === "application/pdf") {
-      // TODO: Integrate pdf-parse or PyMuPDF via API
-      return {
-        text: "[PDF text extraction pending — integrate pdf-parse]",
-        pages: 1,
-        confidence: 0,
-        provider: this.name,
-      };
-    }
-
-    // For images — placeholder for OCR provider
-    if (mimeType.startsWith("image/")) {
-      // TODO: Integrate Tesseract.js or cloud OCR
-      return {
-        text: "[Image OCR pending — integrate Tesseract or cloud provider]",
-        pages: 1,
-        confidence: 0,
-        provider: this.name,
-      };
-    }
-
-    // Plain text
+  if (mimeType === "application/pdf") {
+    logger.info("[OCR] Parsing PDF with pdf-parse v2...");
+    const parser = new PDFParse(new Uint8Array(buffer));
+    const result: TextResult = await parser.getText();
+    const text = result.text.trim();
+    const pages = result.total || 1;
+    logger.info({ pages, textLength: text.length, first100: text.slice(0, 100) }, "[OCR] PDF extraction complete");
     return {
-      text: buffer.toString("utf-8"),
-      pages: 1,
-      confidence: 1.0,
-      provider: this.name,
+      text: text || "",
+      pages,
+      confidence: text.length > 50 ? 0.9 : text.length > 0 ? 0.5 : 0,
+      provider: "pdf-parse",
     };
   }
-}
 
-// Singleton — swap provider here
-let currentProvider: OCRProvider = new DefaultOCRProvider();
+  if (mimeType.startsWith("image/")) {
+    logger.warn("[OCR] Image OCR not implemented");
+    return { text: "", pages: 1, confidence: 0, provider: "none" };
+  }
 
-export function setOCRProvider(provider: OCRProvider) {
-  currentProvider = provider;
-  logger.info({ provider: provider.name }, "OCR provider set");
-}
-
-export async function extractText(buffer: Buffer, mimeType: string): Promise<OCRResult> {
-  return currentProvider.extractText(buffer, mimeType);
+  // Plain text / csv / other text formats
+  const text = buffer.toString("utf-8").trim();
+  logger.info({ textLength: text.length }, "[OCR] Plain text extraction");
+  return { text, pages: 1, confidence: 1.0, provider: "utf8" };
 }

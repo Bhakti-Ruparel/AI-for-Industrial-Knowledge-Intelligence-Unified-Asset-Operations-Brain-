@@ -106,17 +106,19 @@ export async function processDocument(input: PipelineInput): Promise<PipelineRes
   await setStage(documentId, "TEXT_EXTRACTION", { ocrStatus: "IN_PROGRESS" });
 
   let extractedText = "";
+  logger.info({ documentId, mimeType, bufferLength: buffer.length }, "[STAGE 1] OCR START");
   const ocrResult = await tryStage("TEXT_EXTRACTION", () => extractText(buffer, mimeType), errors);
   if (ocrResult) {
     extractedText = ocrResult.text;
     textLength    = extractedText.length;
     ocrConfidence = ocrResult.confidence;
+    logger.info({ documentId, textLength, confidence: ocrConfidence, first100: extractedText.slice(0, 100) }, "[STAGE 1] OCR PASS");
     await documentRepository.storeExtractedText(documentId, extractedText, ocrResult.pages)
-      .catch(() => {});
+      .catch((e) => logger.error({ e: (e as any).message }, "[STAGE 1] storeExtractedText FAILED"));
     await documentRepository.updateProcessingStatus(documentId, "ocrStatus", "COMPLETE")
-      .catch(() => {});
-    logger.info({ documentId, textLength, confidence: ocrConfidence }, "Text extracted");
+      .catch((e) => logger.error({ e: (e as any).message }, "[STAGE 1] updateProcessingStatus FAILED"));
   } else {
+    logger.error({ documentId, errors }, "[STAGE 1] OCR FAIL — no text extracted");
     await documentRepository.updateProcessingStatus(documentId, "ocrStatus", "FAILED")
       .catch(() => {});
   }

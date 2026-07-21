@@ -140,28 +140,32 @@ export async function uploadDocument(input: UploadDocumentInput) {
     { organizationId, userId: uploadedById }
   ).catch(() => {});
 
-  // 5. Trigger async pipeline (non-blocking)
+  // 5. Trigger pipeline — run inline to guarantee execution
   const effectiveDocId = document.id ?? documentId;
   if (effectiveDocId !== "unconfigured") {
-    setImmediate(() => {
-      import("./pipeline").then(({ processDocument }) =>
-        processDocument({
-          documentId:     effectiveDocId,
-          buffer:         file,
-          mimeType,
-          title,
-          organizationId,
-          equipmentId,
-        })
-        .then((result) => {
-          logger.info({ documentId: effectiveDocId, status: result.status, chunks: result.chunksCreated }, "Pipeline finished");
-        })
-        .catch((err) => {
-          logger.error({ documentId: effectiveDocId, error: err.message }, "Pipeline crashed");
-          documentRepository.markFailed(effectiveDocId, "PIPELINE_CRASH", err.message).catch(() => {});
-        })
-      );
-    });
+    logger.info({ documentId: effectiveDocId }, "[PIPELINE] Starting document processing...");
+    try {
+      const { processDocument } = await import("./pipeline");
+      const result = await processDocument({
+        documentId:     effectiveDocId,
+        buffer:         file,
+        mimeType,
+        title,
+        organizationId,
+        equipmentId,
+      });
+      logger.info({
+        documentId: effectiveDocId,
+        status: result.status,
+        textLength: result.textLength,
+        chunks: result.chunksCreated,
+        embeddings: result.embeddingsStored,
+        errors: result.errors,
+      }, "[PIPELINE] Document processing complete");
+    } catch (err: any) {
+      logger.error({ documentId: effectiveDocId, error: err.message, stack: err.stack?.slice(0, 500) }, "[PIPELINE] Pipeline crashed");
+      documentRepository.markFailed(effectiveDocId, "PIPELINE_CRASH", err.message).catch(() => {});
+    }
   }
 
   return {

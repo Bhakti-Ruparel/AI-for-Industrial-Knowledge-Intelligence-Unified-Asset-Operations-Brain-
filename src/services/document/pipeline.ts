@@ -125,10 +125,10 @@ export async function processDocument(input: PipelineInput): Promise<PipelineRes
 
   // Skip remaining stages if no text — but DON'T mark as ERROR
   if (extractedText.length < 50) {
-    // Keep status as UPLOADED so the document remains visible and can be retried
-    await setStage(documentId, "OCR_INCOMPLETE", { ocrStatus: "FAILED" });
-    logger.warn({ documentId, textLength: extractedText.length, errors }, "[PIPELINE] Insufficient text — skipping further stages but keeping document");
-    return { documentId, textLength, chunksCreated, embeddingsStored, nodesCreated, edgesCreated, ocrConfidence, status: "partial", errors: [...errors, "Text extraction incomplete — document still accessible"] };
+    // Set to UPLOADED (stable state) so UI doesn't show infinite spinner
+    await setStage(documentId, "UPLOADED", { status: "UPLOADED", ocrStatus: "FAILED" });
+    logger.warn({ documentId, textLength: extractedText.length, errors }, "[PIPELINE] Insufficient text — document stays as UPLOADED");
+    return { documentId, textLength, chunksCreated, embeddingsStored, nodesCreated, edgesCreated, ocrConfidence, status: "partial", errors: [...errors, "Text extraction unavailable in serverless environment"] };
   }
 
   // ── Stage 2: DOCUMENT_CLASSIFICATION ─────────────────────────────────────
